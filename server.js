@@ -240,8 +240,19 @@ function saveDb(db, options = {}) {
   writeJsonAtomic(DATA_FILE, db);
 }
 
+function dateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Europe/Istanbul",
+  }).formatToParts(date);
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${lookup.year}-${lookup.month}-${lookup.day}`;
+}
+
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKey();
 }
 
 function timeKey() {
@@ -262,13 +273,30 @@ function publicUser(user) {
   };
 }
 
-function publicDb(db) {
+function publicDb(db, user) {
+  const allowedProductIds = new Set(
+    db.products
+      .filter((product) => user.role === "admin" || product.departmentId === user.departmentId)
+      .map((product) => product.id)
+  );
+  const counts = {};
+
+  for (const [date, dateCounts] of Object.entries(db.counts || {})) {
+    counts[date] = {};
+    for (const [productId, count] of Object.entries(dateCounts || {})) {
+      if (allowedProductIds.has(productId)) counts[date][productId] = count;
+    }
+  }
+
   return {
-    departments: db.departments,
-    users: db.users.map(publicUser),
-    products: db.products,
-    counts: db.counts,
-    mailSettings: db.mailSettings,
+    user: publicUser(user),
+    departments: user.role === "admin"
+      ? db.departments
+      : db.departments.filter((department) => department.id === user.departmentId),
+    users: user.role === "admin" ? db.users.map(publicUser) : [publicUser(user)],
+    products: db.products.filter((product) => allowedProductIds.has(product.id)),
+    counts,
+    mailSettings: user.role === "admin" ? db.mailSettings : normalizeMailSettings(db.mailSettings),
   };
 }
 
@@ -606,7 +634,9 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "GET" && pathname === "/api/bootstrap") {
-    sendJson(res, 200, publicDb(db));
+    const user = requireAuth(req, res);
+    if (!user) return;
+    sendJson(res, 200, publicDb(db, user));
     return;
   }
 
