@@ -476,7 +476,17 @@ const state = {
 state.products = ensureProfessionalProductCatalogs(state.products);
 save("hotel-stock-products", state.products);
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+function todayKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Europe/Istanbul",
+  }).formatToParts(new Date());
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${lookup.year}-${lookup.month}-${lookup.day}`;
+}
+
 const app = document.querySelector("#app");
 const backendEnabled = location.protocol === "http:" || location.protocol === "https:";
 
@@ -501,9 +511,15 @@ async function apiRequest(path, options = {}) {
 }
 
 async function syncFromBackend() {
+  if (!state.sessionToken) return;
   try {
     const data = await apiRequest("/api/bootstrap");
     if (!data) return;
+    if (data.user) {
+      state.user = data.user;
+      state.selectedDepartment = data.user.role === "admin" ? state.selectedDepartment : data.user.departmentId;
+      if (!state.view) state.view = data.user.role === "admin" ? "dashboard" : "sayim";
+    }
     state.products = ensureProfessionalProductCatalogs(data.products || state.products);
     state.counts = data.counts || state.counts;
     state.mailSettings = normalizeMailSettings(data.mailSettings || state.mailSettings);
@@ -1553,8 +1569,10 @@ app.addEventListener("submit", async (event) => {
         if (state.sessionToken) {
           sessionStorage.setItem("otel-yonetim-token", state.sessionToken);
         }
-      } catch {
-        user = null;
+      } catch (error) {
+        if (!user) {
+          user = null;
+        }
       }
     }
 
@@ -1566,6 +1584,7 @@ app.addEventListener("submit", async (event) => {
     state.user = user;
     state.selectedDepartment = user.role === "admin" ? "all" : user.departmentId;
     state.view = user.role === "admin" ? "dashboard" : "sayim";
+    await syncFromBackend();
     render();
   }
 
