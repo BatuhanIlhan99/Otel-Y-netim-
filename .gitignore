@@ -1,0 +1,8 @@
+node_modules/
+.env
+backend/*.log
+data/*.json
+data/backups/
+!data/.gitkeep
+npm-debug.log*
+*.tmp

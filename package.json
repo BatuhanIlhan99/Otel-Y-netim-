@@ -1,0 +1,18 @@
+{
+  "name": "otel-yonetim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Otel departmanlari icin web tabanli stok, rapor ve operasyon yonetim uygulamasi.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.16"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "host": "localhost",
+  "port": 8787,
+  "dataFile": "../data/app-data.json",
+  "mailLogFile": "../data/mail-log.json",
+  "smtp": {
+    "enabled": false,
+    "host": "",
+    "port": 587,
+    "username": "",
+    "password": "",
+    "from": "stok@otel.com",
+    "useSsl": true
+  }
+}
