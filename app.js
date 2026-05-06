@@ -1010,15 +1010,38 @@ function todayKey() {
 const app = document.querySelector("#app");
 const localBackendUrl = "http://127.0.0.1:8787";
 const configuredApiBaseUrl = readConfiguredApiBaseUrl();
+const firebaseConfig = window.OTEL_CONFIG?.firebase || {};
+const firebaseConfigured = hasFirebaseConfig(firebaseConfig);
+const firebaseAppDocumentId = cleanFirestoreId(window.OTEL_CONFIG?.firebaseAppId || "otel-yonetim");
 const isGithubPages = location.hostname.endsWith("github.io");
 const isFileMode = location.protocol === "file:";
-const staticFrontendMode = isGithubPages && !configuredApiBaseUrl;
+const staticFrontendMode = isGithubPages && !configuredApiBaseUrl && !firebaseConfigured;
 const backendBaseUrl = configuredApiBaseUrl || (isFileMode ? localBackendUrl : "");
-const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol) && !webApiRequired();
-const backendMode = configuredApiBaseUrl ? "cloud" : isFileMode ? "local" : isGithubPages ? "unconfigured-static" : "same-origin";
+const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol) && !webApiRequired() && !firebaseConfigured;
+const backendMode = firebaseConfigured ? "firebase" : configuredApiBaseUrl ? "cloud" : isFileMode ? "local" : isGithubPages ? "unconfigured-static" : "same-origin";
+const firebaseState = {
+  enabled: firebaseConfigured,
+  readyPromise: null,
+  modules: null,
+  app: null,
+  auth: null,
+  db: null,
+  authUser: null,
+  listeners: [],
+  status: firebaseConfigured ? "Firebase hazırlanıyor." : "",
+  lastError: "",
+};
 
 function cleanApiBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function cleanFirestoreId(value) {
+  return String(value || "otel-yonetim").trim().replace(/[^A-Za-z0-9_-]/g, "-") || "otel-yonetim";
+}
+
+function hasFirebaseConfig(value = {}) {
+  return ["apiKey", "authDomain", "projectId", "appId"].every((key) => String(value?.[key] || "").trim());
 }
 
 function readConfiguredApiBaseUrl() {
@@ -1059,7 +1082,241 @@ async function apiRequest(path, options = {}) {
   return response.json();
 }
 
+async function ensureFirebaseReady() {
+  if (!firebaseState.enabled) return false;
+  if (firebaseState.readyPromise) return firebaseState.readyPromise;
+
+  firebaseState.readyPromise = (async () => {
+    try {
+      firebaseState.status = "Firebase SDK yükleniyor.";
+      const [appModule, authModule, firestoreModule] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js"),
+        import("https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js"),
+      ]);
+
+      const firebaseApp = appModule.getApps().length
+        ? appModule.getApp()
+        : appModule.initializeApp(firebaseConfig);
+      const auth = authModule.getAuth(firebaseApp);
+      const db = firestoreModule.getFirestore(firebaseApp);
+
+      try {
+        await firestoreModule.enableIndexedDbPersistence(db);
+      } catch (error) {
+        console.warn("Firebase offline cache etkinleşmedi.", error);
+      }
+
+      firebaseState.modules = { appModule, authModule, firestoreModule };
+      firebaseState.app = firebaseApp;
+      firebaseState.auth = auth;
+      firebaseState.db = db;
+      firebaseState.status = "Firebase kimlik doğrulama hazırlanıyor.";
+      const credential = await authModule.signInAnonymously(auth);
+      firebaseState.authUser = credential.user;
+      firebaseState.status = "Firebase Spark bağlı.";
+      firebaseState.lastError = "";
+      return true;
+    } catch (error) {
+      firebaseState.status = "Firebase bağlantısı kurulamadı.";
+      firebaseState.lastError = error.message || String(error);
+      console.warn("Firebase bağlantısı kurulamadı.", error);
+      return false;
+    }
+  })();
+
+  return firebaseState.readyPromise;
+}
+
+function firebaseStateDoc(name) {
+  return firebaseState.modules.firestoreModule.doc(
+    firebaseState.db,
+    "otelApps",
+    firebaseAppDocumentId,
+    "state",
+    name
+  );
+}
+
+function firebaseCountsDoc(date) {
+  return firebaseState.modules.firestoreModule.doc(
+    firebaseState.db,
+    "otelApps",
+    firebaseAppDocumentId,
+    "counts",
+    date
+  );
+}
+
+function firebaseCountsCollection() {
+  return firebaseState.modules.firestoreModule.collection(
+    firebaseState.db,
+    "otelApps",
+    firebaseAppDocumentId,
+    "counts"
+  );
+}
+
+async function syncFromFirebase(renderAfter = false) {
+  if (!(await ensureFirebaseReady())) return false;
+  const { getDoc, getDocs, setDoc, serverTimestamp } = firebaseState.modules.firestoreModule;
+
+  try {
+    const [productsSnap, settingsSnap, countsSnap] = await Promise.all([
+      getDoc(firebaseStateDoc("products")),
+      getDoc(firebaseStateDoc("settings")),
+      getDocs(firebaseCountsCollection()),
+    ]);
+
+    if (productsSnap.exists()) {
+      state.products = ensureProfessionalProductCatalogs(productsSnap.data().products || state.products);
+    } else {
+      state.products = ensureProfessionalProductCatalogs(state.products);
+      await setDoc(firebaseStateDoc("products"), {
+        products: state.products,
+        updatedAt: serverTimestamp(),
+        updatedBy: state.user?.username || "system",
+      });
+    }
+
+    if (settingsSnap.exists()) {
+      state.mailSettings = normalizeMailSettings(settingsSnap.data().mailSettings || state.mailSettings);
+    } else {
+      await setDoc(firebaseStateDoc("settings"), {
+        mailSettings: state.mailSettings,
+        updatedAt: serverTimestamp(),
+        updatedBy: state.user?.username || "system",
+      });
+    }
+
+    const nextCounts = {};
+    countsSnap.forEach((docSnap) => {
+      nextCounts[docSnap.id] = docSnap.data().items || {};
+    });
+    state.counts = nextCounts;
+
+    save("hotel-stock-products", state.products);
+    save("hotel-stock-counts", state.counts);
+    save("hotel-stock-mail-settings", state.mailSettings);
+    firebaseState.status = "Firebase Spark bağlı.";
+    firebaseState.lastError = "";
+    startFirebaseListeners();
+    if (renderAfter) render();
+    return true;
+  } catch (error) {
+    firebaseState.status = "Firebase veri senkronizasyonu başarısız.";
+    firebaseState.lastError = error.message || String(error);
+    console.warn("Firebase veri senkronizasyonu başarısız.", error);
+    if (renderAfter) render();
+    return false;
+  }
+}
+
+async function syncFirebaseDate(date, renderAfter = false) {
+  if (!(await ensureFirebaseReady())) return false;
+  const { getDoc } = firebaseState.modules.firestoreModule;
+  try {
+    const snap = await getDoc(firebaseCountsDoc(date));
+    state.counts[date] = snap.exists() ? snap.data().items || {} : {};
+    save("hotel-stock-counts", state.counts);
+    if (renderAfter) render();
+    return true;
+  } catch (error) {
+    console.warn("Firebase tarih sayımı okunamadı.", error);
+    return false;
+  }
+}
+
+function startFirebaseListeners() {
+  if (!firebaseState.enabled || !firebaseState.authUser || firebaseState.listeners.length > 0 || !state.user) return;
+  const { onSnapshot } = firebaseState.modules.firestoreModule;
+
+  firebaseState.listeners.push(
+    onSnapshot(firebaseStateDoc("products"), (snap) => {
+      if (!snap.exists()) return;
+      state.products = ensureProfessionalProductCatalogs(snap.data().products || state.products);
+      save("hotel-stock-products", state.products);
+      if (state.user) render();
+    }, (error) => console.warn("Firebase ürün dinleyicisi hata verdi.", error)),
+    onSnapshot(firebaseStateDoc("settings"), (snap) => {
+      if (!snap.exists()) return;
+      state.mailSettings = normalizeMailSettings(snap.data().mailSettings || state.mailSettings);
+      save("hotel-stock-mail-settings", state.mailSettings);
+      if (state.user) render();
+    }, (error) => console.warn("Firebase ayar dinleyicisi hata verdi.", error)),
+    onSnapshot(firebaseCountsDoc(todayKey()), (snap) => {
+      state.counts[todayKey()] = snap.exists() ? snap.data().items || {} : {};
+      save("hotel-stock-counts", state.counts);
+      if (state.user && state.view === "sayim") render();
+    }, (error) => console.warn("Firebase sayım dinleyicisi hata verdi.", error))
+  );
+}
+
+function stopFirebaseListeners() {
+  firebaseState.listeners.forEach((unsubscribe) => {
+    try {
+      unsubscribe();
+    } catch {}
+  });
+  firebaseState.listeners = [];
+}
+
+async function saveProductsToFirebase() {
+  if (!(await ensureFirebaseReady())) return false;
+  const { setDoc, serverTimestamp } = firebaseState.modules.firestoreModule;
+  await setDoc(firebaseStateDoc("products"), {
+    products: state.products,
+    updatedAt: serverTimestamp(),
+    updatedBy: state.user?.username || "system",
+  }, { merge: true });
+  return true;
+}
+
+async function saveCountToFirebase(date, productId, entry) {
+  if (!(await ensureFirebaseReady())) return false;
+  const { setDoc, serverTimestamp } = firebaseState.modules.firestoreModule;
+  await setDoc(firebaseCountsDoc(date), {
+    items: { [productId]: entry },
+    updatedAt: serverTimestamp(),
+    updatedBy: state.user?.username || "system",
+  }, { merge: true });
+  return true;
+}
+
+async function saveMailSettingsToFirebase() {
+  if (!(await ensureFirebaseReady())) return false;
+  const { setDoc, serverTimestamp } = firebaseState.modules.firestoreModule;
+  await setDoc(firebaseStateDoc("settings"), {
+    mailSettings: state.mailSettings,
+    updatedAt: serverTimestamp(),
+    updatedBy: state.user?.username || "system",
+  }, { merge: true });
+  return true;
+}
+
+async function resetFirebaseDemoData() {
+  if (!(await ensureFirebaseReady())) return false;
+  const { getDocs, deleteDoc, setDoc, serverTimestamp } = firebaseState.modules.firestoreModule;
+  const countDocs = await getDocs(firebaseCountsCollection());
+  await Promise.all(countDocs.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+  await setDoc(firebaseStateDoc("products"), {
+    products: state.products,
+    updatedAt: serverTimestamp(),
+    updatedBy: state.user?.username || "system",
+  });
+  await setDoc(firebaseStateDoc("settings"), {
+    mailSettings: state.mailSettings,
+    updatedAt: serverTimestamp(),
+    updatedBy: state.user?.username || "system",
+  }, { merge: true });
+  return true;
+}
+
 async function syncFromBackend() {
+  if (firebaseState.enabled) {
+    await syncFromFirebase(false);
+    return;
+  }
   if (!state.sessionToken) return;
   try {
     const data = await apiRequest("/api/bootstrap");
@@ -1233,6 +1490,9 @@ function setTodayCount(productId, qty, note = "", orderRequest = null) {
   state.counts[date] ||= {};
   state.counts[date][productId] = entry;
   save("hotel-stock-counts", state.counts);
+  if (firebaseState.enabled) {
+    saveCountToFirebase(date, productId, entry).catch((error) => console.warn("Sayım Firebase'e yazılamadı.", error));
+  }
   apiRequest("/api/counts", {
     method: "POST",
     body: JSON.stringify({ date, productId, ...entry }),
@@ -1312,6 +1572,17 @@ function renderTopbar() {
 
 function renderRuntimeBanner() {
   if (backendEnabled) return "";
+  if (firebaseState.enabled) {
+    const detail = firebaseState.lastError
+      ? `Firebase hata: ${escapeHtml(firebaseState.lastError)}`
+      : "Ücretsiz Firebase Spark modu ortak stok verisini Firestore üzerinde tutar. Gerçek otomatik mail için Cloud Functions ücretli plan ister; rapor metni uygulamada hazırlanır.";
+    return `
+      <section class="notice-panel">
+        <strong>${escapeHtml(firebaseState.status || "Firebase Spark modu")}</strong>
+        <span>${detail}</span>
+      </section>
+    `;
+  }
   if (staticFrontendMode) {
     return `
       <section class="notice-panel">
@@ -1879,6 +2150,7 @@ function formatMailDate(value) {
 }
 
 function mailStatusBadge(status) {
+  if (firebaseState.enabled) return `<span class="badge ${firebaseState.authUser ? "ok" : ""}">Firebase Spark</span>`;
   if (!status) return `<span class="badge">Yerel mod</span>`;
   if (status.smtp?.enabled && status.smtp?.ok) return `<span class="badge ok">SMTP hazır</span>`;
   if (status.smtp?.enabled && !status.smtp?.ok) return `<span class="badge danger">SMTP hata</span>`;
@@ -1887,7 +2159,9 @@ function mailStatusBadge(status) {
 
 function renderMailStatusPanel() {
   const status = state.mailStatus;
-  const smtpMessage = status?.smtp?.message || (backendEnabled ? "Backend mail durumu bekleniyor." : "Yerel dosya modunda gerçek mail gönderimi yapılmaz.");
+  const smtpMessage = status?.smtp?.message || (firebaseState.enabled
+    ? "Firebase ücretsiz modda otomatik mail gönderimi kapalıdır; rapor metni hazırlanır ve manuel kullanılabilir."
+    : backendEnabled ? "Backend mail durumu bekleniyor." : "Yerel dosya modunda gerçek mail gönderimi yapılmaz.");
   const reminderDelivery = status?.automation?.reminder?.lastDelivery;
   const reportDelivery = status?.automation?.report?.lastDelivery;
   return `
@@ -1943,13 +2217,22 @@ function renderMailLogPanel() {
 
 function renderWebApiPanel() {
   const displayUrl = backendDisplayUrl();
-  const badgeClass = backendEnabled ? "ok" : "";
-  const badgeText = backendEnabled ? "Web API bağlı" : "Önizleme modu";
-  const note = webApiRequired()
+  const badgeClass = backendEnabled || firebaseState.authUser ? "ok" : "";
+  const badgeText = firebaseState.enabled
+    ? (firebaseState.authUser ? "Firebase bağlı" : "Firebase hazırlanıyor")
+    : backendEnabled ? "Web API bağlı" : "Önizleme modu";
+  const note = firebaseState.enabled
+    ? "Ücretsiz Firebase Spark modu ortak stok verisini Firestore'da tutar. Mail ön izleme çalışır; gerçek otomatik mail için ücretli Cloud Functions gerekir."
+    : webApiRequired()
     ? "GitHub Pages sadece arayüzdür. Ortak veri ve mail için otel içi backend adresinden gir veya bulut backend URL'i tanımla."
     : backendMode === "same-origin"
       ? "Uygulama backend ile aynı web adresinden çalışıyor; telefon ve bilgisayarlar aynı veriyi kullanır."
       : "Bu adres tüm cihazlarda kullanılacak merkezi API bağlantısıdır.";
+  const connectionLabel = firebaseState.enabled ? "Firebase proje" : "API";
+  const connectionValue = firebaseState.enabled ? firebaseConfig.projectId : displayUrl || "Tanımlı değil";
+  const apiSettingsDisabled = firebaseState.enabled ? "disabled" : "";
+  const apiInputValue = firebaseState.enabled ? firebaseConfig.projectId : configuredApiBaseUrl;
+  const apiInputLabel = firebaseState.enabled ? "Firebase proje ID" : "Bulut backend adresi";
 
   return `
     <section class="panel web-api-panel">
@@ -1959,18 +2242,18 @@ function renderWebApiPanel() {
       </div>
       <form class="form-body" data-action="api-settings">
         <div class="form-row">
-          <label>Bulut backend adresi</label>
-          <input name="apiBaseUrl" placeholder="https://otel-yonetim.onrender.com" value="${escapeHtml(configuredApiBaseUrl)}" />
+          <label>${apiInputLabel}</label>
+          <input name="apiBaseUrl" placeholder="https://otel-yonetim.onrender.com" value="${escapeHtml(apiInputValue)}" ${apiSettingsDisabled} />
           <span class="hint">${escapeHtml(note)}</span>
         </div>
         <div class="toolbar">
-          <button class="btn" type="submit">API adresini kaydet</button>
+          <button class="btn" type="submit" ${apiSettingsDisabled}>API adresini kaydet</button>
           <button class="btn secondary" type="button" data-action="refresh-mail-status">Bağlantıyı kontrol et</button>
         </div>
       </form>
       <div class="meta-list">
         <div><strong>Aktif mod</strong><span>${escapeHtml(backendMode)}</span></div>
-        <div><strong>API</strong><span>${escapeHtml(displayUrl || "Tanımlı değil")}</span></div>
+        <div><strong>${connectionLabel}</strong><span>${escapeHtml(connectionValue)}</span></div>
       </div>
     </section>
   `;
@@ -1991,6 +2274,10 @@ function backendConnectionMessage() {
 
 async function handleMailBackendFailure(kind, error) {
   const text = kind === "reminder" ? buildReminderMail() : buildMailReport();
+  if (firebaseState.enabled) {
+    window.alert("Firebase ücretsiz modda gerçek otomatik mail yok. Rapor ve hatırlatma metni ekranda hazırlanır; gerçek otomasyon için Firebase Cloud Functions ücretli plan ister.");
+    return;
+  }
   if (staticFrontendMode) {
     window.alert("Mail gönderimi için web backend gerekli. Ana bilgisayarda OTEL_AGDA_CALISTIR.cmd çalıştır, ekranda çıkan http://192.168.x.x:8787/ adresinden giriş yap.");
     return;
@@ -2007,7 +2294,7 @@ function renderMailSettings() {
   const mailActionDisabled = backendEnabled ? "" : "disabled";
   const mailActionHint = backendEnabled
     ? ""
-    : `<span class="hint">Mail gönderimi için backend adresinden giriş yapılmalı.</span>`;
+    : `<span class="hint">${firebaseState.enabled ? "Firebase ücretsiz modda otomatik mail için ücretli Cloud Functions gerekir; bu ekrandaki metinler ön izleme ve manuel kullanım içindir." : "Mail gönderimi için backend adresinden giriş yapılmalı."}</span>`;
   return `
     <div class="grid mail-settings-layout">
       ${renderWebApiPanel()}
@@ -2237,6 +2524,9 @@ function upsertProduct(form) {
   state.editingProductId = null;
   state.openStockDepartmentId = product.departmentId;
   save("hotel-stock-products", state.products);
+  if (firebaseState.enabled) {
+    saveProductsToFirebase().catch((error) => console.warn("Ürün Firebase'e yazılamadı.", error));
+  }
   apiRequest(isUpdate ? `/api/products/${encodeURIComponent(product.id)}` : "/api/products", {
     method: isUpdate ? "PUT" : "POST",
     body: JSON.stringify(product),
@@ -2256,6 +2546,7 @@ app.addEventListener("click", async (event) => {
 
   if (action === "logout") {
     apiRequest("/api/logout", { method: "POST" }).catch(() => {});
+    stopFirebaseListeners();
     sessionStorage.removeItem("otel-yonetim-token");
     state.user = null;
     state.sessionToken = "";
@@ -2329,6 +2620,10 @@ app.addEventListener("click", async (event) => {
   }
 
   if (action === "refresh-mail-status") {
+    if (firebaseState.enabled) {
+      await syncFromFirebase(true);
+      return;
+    }
     await refreshMailStatus(true);
   }
 
@@ -2348,6 +2643,9 @@ app.addEventListener("click", async (event) => {
     const product = state.products.find((item) => item.id === target.dataset.id);
     if (product) product.active = !product.active;
     save("hotel-stock-products", state.products);
+    if (firebaseState.enabled) {
+      saveProductsToFirebase().catch((error) => console.warn("Ürün durumu Firebase'e yazılamadı.", error));
+    }
     if (product) {
       apiRequest(`/api/products/${encodeURIComponent(product.id)}/active`, {
         method: "PATCH",
@@ -2366,6 +2664,9 @@ app.addEventListener("click", async (event) => {
     state.counts = {};
     state.editingProductId = null;
     state.openStockDepartmentId = "temizlik";
+    if (firebaseState.enabled) {
+      resetFirebaseDemoData().catch((error) => console.warn("Firebase demo verisi sıfırlanamadı.", error));
+    }
     render();
   }
 });
@@ -2380,7 +2681,7 @@ app.addEventListener("input", (event) => {
   }
 });
 
-app.addEventListener("change", (event) => {
+app.addEventListener("change", async (event) => {
   if (event.target.dataset.action === "department") {
     state.selectedDepartment = event.target.value;
     render();
@@ -2392,6 +2693,9 @@ app.addEventListener("change", (event) => {
 
   if (event.target.dataset.action === "report-date") {
     state.reportDate = event.target.value || todayKey();
+    if (firebaseState.enabled) {
+      await syncFirebaseDate(state.reportDate);
+    }
     render();
   }
 });
@@ -2475,6 +2779,9 @@ app.addEventListener("submit", async (event) => {
       },
     };
     save("hotel-stock-mail-settings", state.mailSettings);
+    if (firebaseState.enabled) {
+      await saveMailSettingsToFirebase().catch((error) => console.warn("Mail ayarları Firebase'e yazılamadı.", error));
+    }
     try {
       await apiRequest("/api/mail-settings", {
         method: "PUT",

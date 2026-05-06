@@ -28,6 +28,7 @@ Bu klasör, otel içinde günlük stok sayımı, kritik stok raporu, personel ha
 - Token bazlı backend oturumu ve rol bazlı API yetkisi
 - SMTP doğrulama, mail loglama ve otomatik zamanlayıcı
 - Render uyumlu bulut backend, kalıcı disk ve GitHub Pages API bağlantı hazırlığı
+- Firebase Spark ücretsiz ortak stok modu
 
 ## Departmanlar
 
@@ -111,6 +112,24 @@ GitHub Pages arayüzünü bulut backend'e bağlamak için:
 ```text
 BULUT_API_ADRESI_KAYDET.cmd
 ```
+
+## Ücretsiz Firebase modu
+
+Kart istemeyen ücretsiz yol için Firebase Spark kullanılabilir. Bu modda ortak stok verisi Firestore'da tutulur, GitHub Pages arayüzü çalışmaya devam eder.
+
+Kurulum:
+
+```text
+FIREBASE_UCRETSIZ_KURULUM.md
+```
+
+Firebase web config'ini kaydetmek için:
+
+```text
+FIREBASE_CONFIG_KAYDET.cmd
+```
+
+Not: Firebase ücretsiz Spark planında gerçek otomatik mail için gereken Cloud Functions yoktur. Mail ekranı rapor metnini hazırlar; gerçek otomatik gönderim daha sonra ücretli Functions veya ayrı mail servisiyle açılır.
 
 ## GitHub notu
 
