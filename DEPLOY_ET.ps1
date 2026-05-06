@@ -84,6 +84,10 @@ function Copy-SafeItem {
   if ($parent -and -not (Test-Path -LiteralPath $parent)) {
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
   }
+  if ((Test-Path -LiteralPath $source -PathType Container) -and (Test-Path -LiteralPath $destination)) {
+    Require-WorkspacePath $destination
+    Remove-Item -LiteralPath $destination -Recurse -Force
+  }
   Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
 }
 
@@ -197,7 +201,7 @@ try {
   Write-Host "Deploy tamamlandi." -ForegroundColor Green
   Write-Host "Commit: $($localHead.Substring(0, 7))"
   Write-Host "Site: $PagesUrl"
-  Write-Host "Cache temiz link: $PagesUrl?v=$($localHead.Substring(0, 7))"
+  Write-Host "Cache temiz link: ${PagesUrl}?v=$($localHead.Substring(0, 7))"
 } finally {
   $plainToken = $null
   $encodedToken = $null
