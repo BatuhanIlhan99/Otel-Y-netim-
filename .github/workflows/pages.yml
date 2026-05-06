@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp index.html 404.html app.js styles.css dist/
+          cp index.html 404.html app.js styles.css config.js dist/
           touch dist/.nojekyll
 
       - name: Configure Pages

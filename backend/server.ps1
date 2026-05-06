@@ -368,6 +368,13 @@ function Serve-StaticFile($ctx, [string]$routePath) {
     Send-Text $ctx 403 "Forbidden"
     return
   }
+  $firstSegment = $relativePath.Split("/")[0].Split("\")[0]
+  $blockedRoots = @("data", ".git", ".github", ".deploy-secrets", ".deploy-work", "backend")
+  $blockedFiles = @(".env", ".env.example", "server.js", "package.json", "render.yaml")
+  if ($blockedRoots -contains $firstSegment -or $blockedFiles -contains ([System.IO.Path]::GetFileName($staticPath))) {
+    Send-Text $ctx 404 "Not found"
+    return
+  }
   if (-not (Test-Path -LiteralPath $staticPath -PathType Leaf)) {
     Send-Text $ctx 404 "Not found"
     return
@@ -547,8 +554,15 @@ $script:MailStateFile = Resolve-AppPath $script:Config.mailStateFile
 $script:LastReminderDate = ""
 $script:LastReportDate = ""
 
-$prefix = "http://$($script:Config.host):$($script:Config.port)/"
-$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Parse("127.0.0.1"), [int]$script:Config.port)
+$listenHost = if ($script:Config.host) { [string]$script:Config.host } else { "127.0.0.1" }
+$listenAddress = if ($listenHost -eq "0.0.0.0" -or $listenHost -eq "*" -or $listenHost -eq "+") {
+  [System.Net.IPAddress]::Any
+} elseif ($listenHost -eq "localhost") {
+  [System.Net.IPAddress]::Loopback
+} else {
+  [System.Net.IPAddress]::Parse($listenHost)
+}
+$listener = [System.Net.Sockets.TcpListener]::new($listenAddress, [int]$script:Config.port)
 $listener.Start()
 
 $timer = New-Object System.Timers.Timer
@@ -557,7 +571,17 @@ $timer.AutoReset = $true
 Register-ObjectEvent -InputObject $timer -EventName Elapsed -Action { Invoke-DueAutomations } | Out-Null
 $timer.Start()
 
-Write-Host "Otel Yönetim backend çalışıyor: $prefix"
+Write-Host "Otel Yönetim backend çalışıyor."
+Write-Host "Bu bilgisayar: http://127.0.0.1:$($script:Config.port)/"
+if ($listenAddress.Equals([System.Net.IPAddress]::Any)) {
+  $lanIps = [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) |
+    Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and -not [System.Net.IPAddress]::IsLoopback($_) } |
+    ForEach-Object { $_.IPAddressToString } |
+    Sort-Object -Unique
+  foreach ($ip in $lanIps) {
+    Write-Host "Telefon/PC ayni Wi-Fi: http://$ip`:$($script:Config.port)/"
+  }
+}
 Write-Host "Durdurmak için Ctrl+C"
 
 function Read-HttpContext($client) {

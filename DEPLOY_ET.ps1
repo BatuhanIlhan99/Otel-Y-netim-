@@ -124,6 +124,8 @@ function Sync-ProjectFiles {
     "index.html",
     "MAIL_KURULUMU.md",
     "MASAUSTU-KISAYOL-OLUSTUR.cmd",
+    "OTEL_AGDA_CALISTIR.cmd",
+    "OTEL_AGDA_KULLANIM.md",
     "OTOMATIK_DEPLOY.md",
     "package.json",
     "PRODUCTION_CHECKLIST.md",
