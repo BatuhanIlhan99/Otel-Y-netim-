@@ -6,3 +6,6 @@ data/backups/
 !data/.gitkeep
 npm-debug.log*
 *.tmp
+.deploy-secrets/
+.deploy-work/
+deploy-log*.txt
