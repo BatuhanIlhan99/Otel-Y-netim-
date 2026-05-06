@@ -131,30 +131,117 @@ function Get-ReportData($db, [string]$date, [string]$departmentId) {
   return $items
 }
 
+function Get-ManualOrderRequests($db, [string]$date, [string]$departmentId) {
+  $items = New-Object System.Collections.Generic.List[object]
+  foreach ($product in @($db.products | Where-Object { $_.active -eq $true })) {
+    if ($departmentId -ne "all" -and $product.departmentId -ne $departmentId) { continue }
+    $count = Get-Count $db $date $product.id
+    if (-not $count -or -not $count.orderRequest -or -not $count.orderRequest.requested) { continue }
+    $qty = [double]$count.qty
+    $items.Add([pscustomobject]@{
+      productId = $product.id
+      productName = $product.name
+      departmentId = $product.departmentId
+      departmentName = Get-DepartmentName $db $product.departmentId
+      unit = $product.unit
+      qty = $qty
+      minQty = $product.minQty
+      requestedQty = if ($count.orderRequest.qty) { [double]$count.orderRequest.qty } else { 0 }
+      reason = if ($count.orderRequest.reason) { $count.orderRequest.reason } else { "" }
+    })
+  }
+  return $items
+}
+
+function Get-DepartmentSummaries($db, [string]$date, [string]$departmentId) {
+  $items = New-Object System.Collections.Generic.List[object]
+  foreach ($department in @($db.departments)) {
+    if ($departmentId -ne "all" -and $department.id -ne $departmentId) { continue }
+    $products = @($db.products | Where-Object { $_.active -eq $true -and $_.departmentId -eq $department.id })
+    $counted = 0
+    $critical = 0
+    $manual = 0
+    foreach ($product in $products) {
+      $count = Get-Count $db $date $product.id
+      if ($count) { $counted += 1 }
+      $qty = if ($count) { [double]$count.qty } else { [double]$product.lastQty }
+      if ($qty -le [double]$product.minQty) { $critical += 1 }
+      if ($count -and $count.orderRequest -and $count.orderRequest.requested) { $manual += 1 }
+    }
+    $completion = if ($products.Count -gt 0) { [math]::Round(($counted / $products.Count) * 100) } else { 0 }
+    $items.Add([pscustomobject]@{
+      departmentId = $department.id
+      departmentName = Get-DepartmentName $db $department.id
+      products = $products.Count
+      counted = $counted
+      missing = [math]::Max($products.Count - $counted, 0)
+      critical = $critical
+      manualRequests = $manual
+      completion = $completion
+      complete = ($products.Count -gt 0 -and $counted -eq $products.Count)
+    })
+  }
+  return $items
+}
+
 function Build-OrderReportMail($db, [string]$date, [string]$departmentId) {
   $settings = $db.mailSettings.report
   $items = Get-ReportData $db $date $departmentId
+  $manualItems = Get-ManualOrderRequests $db $date $departmentId
+  $summaries = Get-DepartmentSummaries $db $date $departmentId
+  $totalProducts = 0
+  $totalCounted = 0
+  $totalMissing = 0
+  foreach ($summary in $summaries) {
+    $totalProducts += [int]$summary.products
+    $totalCounted += [int]$summary.counted
+    $totalMissing += [int]$summary.missing
+  }
   $lines = New-Object System.Collections.Generic.List[string]
   $lines.Add([string]$settings.subject)
   $lines.Add("Tarih: $date")
   $lines.Add("Alıcılar: $($settings.recipients)")
   $lines.Add("Gönderim saati: $($settings.sendTime)")
   $lines.Add("")
+  $lines.Add("Özet:")
+  $lines.Add("- Aktif ürün: $totalProducts")
+  $lines.Add("- Sayılan ürün: $totalCounted")
+  $lines.Add("- Sayımı eksik ürün: $totalMissing")
+  $lines.Add("- Kritik stok: $($items.Count)")
+  $lines.Add("- Manuel sipariş talebi: $($manualItems.Count)")
+  $lines.Add("")
+  $lines.Add("Departman durumu:")
+  foreach ($summary in $summaries) {
+    $lines.Add("- $($summary.departmentName): $($summary.counted)/$($summary.products) sayıldı | %$($summary.completion) | Kritik: $($summary.critical) | Manuel talep: $($summary.manualRequests)")
+  }
+  $lines.Add("")
   $lines.Add("Sipariş verilmesi gereken ürünler:")
   $lines.Add("")
 
   if ($items.Count -eq 0) {
     $lines.Add("Bugün minimum stok seviyesinin altında ürün bulunmuyor.")
-    return ($lines -join "`n")
+  } else {
+    foreach ($group in ($items | Group-Object departmentName)) {
+      $lines.Add($group.Name)
+      foreach ($item in $group.Group) {
+        $note = if ([string]::IsNullOrWhiteSpace($item.note)) { "" } else { " | Not: $($item.note)" }
+        $lines.Add("- $($item.productName): $($item.qty) $($item.unit) | Minimum: $($item.minQty) | Sipariş gerekli$note")
+      }
+      $lines.Add("")
+    }
   }
 
-  foreach ($group in ($items | Group-Object departmentName)) {
-    $lines.Add($group.Name)
-    foreach ($item in $group.Group) {
-      $note = if ([string]::IsNullOrWhiteSpace($item.note)) { "" } else { " | Not: $($item.note)" }
-      $lines.Add("- $($item.productName): $($item.qty) $($item.unit) | Minimum: $($item.minQty) | Sipariş gerekli$note")
+  $lines.Add("")
+  $lines.Add("Manuel sipariş talepleri:")
+  $lines.Add("")
+  if ($manualItems.Count -eq 0) {
+    $lines.Add("Yeterli stokta olup ayrıca sipariş talep edilen ürün yok.")
+  } else {
+    foreach ($item in $manualItems) {
+      $requestedQty = if ($item.requestedQty) { " | Talep miktarı: $($item.requestedQty) $($item.unit)" } else { "" }
+      $reason = if ([string]::IsNullOrWhiteSpace($item.reason)) { "" } else { " | Gerekçe: $($item.reason)" }
+      $lines.Add("- $($item.departmentName) / $($item.productName): mevcut $($item.qty) $($item.unit)$requestedQty$reason")
     }
-    $lines.Add("")
   }
 
   return ($lines -join "`n")
@@ -162,15 +249,21 @@ function Build-OrderReportMail($db, [string]$date, [string]$departmentId) {
 
 function Build-ReminderMail($db) {
   $settings = $db.mailSettings.reminder
-  return @(
+  $lines = New-Object System.Collections.Generic.List[string]
+  @(
     $settings.subject,
+    "Tarih: $(Get-DateKey)",
     "Alıcılar: $($settings.recipients)",
     "Gönderim saati: $($settings.sendTime)",
     "",
     $settings.message,
     "",
-    "Departmanlar: Temizlik, Mutfak, Büfe, Smile Food House, Resepsiyon"
-  ) -join "`n"
+    "Bugünkü departman sayım durumu:"
+  ) | ForEach-Object { $lines.Add([string]$_) }
+  foreach ($summary in (Get-DepartmentSummaries $db (Get-DateKey) "all")) {
+    $lines.Add("- $($summary.departmentName): $($summary.counted)/$($summary.products) sayıldı | Kalan: $($summary.missing)")
+  }
+  return ($lines -join "`n")
 }
 
 function Add-MailLog([string]$kind, [string]$status, [string]$subject, [string]$recipients, [string]$body) {
@@ -185,7 +278,41 @@ function Add-MailLog([string]$kind, [string]$status, [string]$subject, [string]$
     body = $body
     createdAt = (Get-Date).ToString("s")
   }
+  if ($items.Count -gt 500) {
+    $items = $items[($items.Count - 500)..($items.Count - 1)]
+  }
   Write-JsonFile $script:MailLogFile $items
+}
+
+function Get-MailStatus($db) {
+  $log = @(Read-JsonFile $script:MailLogFile @())
+  [array]::Reverse($log)
+  $smtpMessage = if ($script:Config.smtp.enabled) {
+    if ([string]::IsNullOrWhiteSpace($script:Config.smtp.host) -or [string]::IsNullOrWhiteSpace($script:Config.smtp.from)) {
+      "SMTP açık ama host/from ayarı eksik."
+    } else {
+      "SMTP ayarları tanımlı."
+    }
+  } else {
+    "SMTP kapalı; gönderimler mail log dosyasına yazılır."
+  }
+  return [pscustomobject]@{
+    smtp = [pscustomobject]@{
+      ok = (-not $script:Config.smtp.enabled) -or (-not [string]::IsNullOrWhiteSpace($script:Config.smtp.host) -and -not [string]::IsNullOrWhiteSpace($script:Config.smtp.from))
+      enabled = [bool]$script:Config.smtp.enabled
+      message = $smtpMessage
+      host = $script:Config.smtp.host
+      port = $script:Config.smtp.port
+      secure = $script:Config.smtp.useSsl
+      from = $script:Config.smtp.from
+    }
+    automation = [pscustomobject]@{
+      reminder = [pscustomobject]@{ sendTime = $db.mailSettings.reminder.sendTime; lastDelivery = $null }
+      report = [pscustomobject]@{ sendTime = $db.mailSettings.report.sendTime; lastDelivery = $null }
+    }
+    mailLog = @($log | Select-Object -First 10)
+    catchUpMinutes = $script:Config.mailCatchUpMinutes
+  }
 }
 
 function Send-MailOrLog([string]$kind, [string]$subject, [string]$recipients, [string]$body) {
@@ -352,8 +479,10 @@ function Handle-Api($ctx, [string]$method, [string]$path) {
     $date = Get-QueryValue $ctx "date" (Get-DateKey)
     $departmentId = Get-QueryValue $ctx "departmentId" "all"
     $items = Get-ReportData $db $date $departmentId
+    $manualItems = Get-ManualOrderRequests $db $date $departmentId
+    $summaries = Get-DepartmentSummaries $db $date $departmentId
     $mailText = Build-OrderReportMail $db $date $departmentId
-    Send-Json $ctx 200 ([pscustomobject]@{ date = $date; departmentId = $departmentId; orderItems = $items; mailText = $mailText })
+    Send-Json $ctx 200 ([pscustomobject]@{ date = $date; departmentId = $departmentId; departmentSummaries = $summaries; orderItems = $items; manualOrderRequests = $manualItems; mailText = $mailText })
     return
   }
 
@@ -374,6 +503,11 @@ function Handle-Api($ctx, [string]$method, [string]$path) {
     return
   }
 
+  if ($method -eq "GET" -and $path -eq "/api/mail/status") {
+    Send-Json $ctx 200 (Get-MailStatus $db)
+    return
+  }
+
   if ($method -eq "POST" -and $path -eq "/api/mail/send-reminder") {
     $bodyText = Build-ReminderMail $db
     $result = Send-MailOrLog "reminder" $db.mailSettings.reminder.subject $db.mailSettings.reminder.recipients $bodyText
@@ -389,6 +523,19 @@ function Handle-Api($ctx, [string]$method, [string]$path) {
     return
   }
 
+  if ($method -eq "POST" -and $path -eq "/api/mail/verify-smtp") {
+    if (-not $script:Config.smtp.enabled) {
+      Send-Json $ctx 200 ([pscustomobject]@{ ok = $true; enabled = $false; message = "SMTP kapalı; gönderimler mail log dosyasına yazılır." })
+      return
+    }
+    if ([string]::IsNullOrWhiteSpace($script:Config.smtp.host) -or [string]::IsNullOrWhiteSpace($script:Config.smtp.from)) {
+      Send-Json $ctx 200 ([pscustomobject]@{ ok = $false; enabled = $true; message = "SMTP host/from ayarı eksik." })
+      return
+    }
+    Send-Json $ctx 200 ([pscustomobject]@{ ok = $true; enabled = $true; message = "SMTP ayarları tanımlı." })
+    return
+  }
+
   Send-Text $ctx 404 "API route not found"
 }
 
@@ -396,6 +543,7 @@ $script:Config = Read-JsonFile $ConfigPath ([pscustomobject]@{})
 $script:RootPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $script:DataFile = Resolve-AppPath $script:Config.dataFile
 $script:MailLogFile = Resolve-AppPath $script:Config.mailLogFile
+$script:MailStateFile = Resolve-AppPath $script:Config.mailStateFile
 $script:LastReminderDate = ""
 $script:LastReportDate = ""
 

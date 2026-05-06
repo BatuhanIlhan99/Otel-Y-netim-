@@ -416,6 +416,525 @@ const professionalKitchenCatalog = [
   ["Limonata Konsantresi", "gulplaj-restorant", "lt", 24, 8],
 ];
 
+const professionalReceptionCatalog = [
+  ["Oda Kartı", "resepsiyon", "adet", 220, 80],
+  ["Kayıt Formu", "resepsiyon", "adet", 140, 50],
+  ["Kalem", "resepsiyon", "adet", 65, 25],
+  ["RFID Oda Kartı", "resepsiyon", "adet", 260, 90],
+  ["Manyetik Yedek Oda Kartı", "resepsiyon", "adet", 180, 60],
+  ["Oda Kartı Kılıfı", "resepsiyon", "adet", 300, 100],
+  ["Oda Kartı Zarfı", "resepsiyon", "adet", 300, 100],
+  ["Kart Kodlama Temizleme Kartı", "resepsiyon", "adet", 24, 8],
+  ["Kart Yazıcı Ribbon", "resepsiyon", "adet", 8, 3],
+  ["Kart Yazıcı Temizleme Seti", "resepsiyon", "set", 6, 2],
+  ["Misafir Bilekliği", "resepsiyon", "adet", 400, 120],
+  ["Ziyaretçi Kartı", "resepsiyon", "adet", 120, 40],
+  ["Personel Geçici Kartı", "resepsiyon", "adet", 80, 25],
+  ["Anahtar Etiketi", "resepsiyon", "adet", 250, 80],
+  ["Emanet Anahtar Etiketi", "resepsiyon", "adet", 120, 40],
+  ["Anahtar Dolabı Etiket Şeridi", "resepsiyon", "rulo", 12, 4],
+  ["Check-in Kayıt Formu", "resepsiyon", "adet", 300, 100],
+  ["Check-out Kontrol Formu", "resepsiyon", "adet", 200, 70],
+  ["Konaklama Belgesi", "resepsiyon", "adet", 300, 100],
+  ["Misafir Bilgi Formu", "resepsiyon", "adet", 300, 100],
+  ["KVKK Aydınlatma Metni", "resepsiyon", "adet", 250, 80],
+  ["Açık Rıza Formu", "resepsiyon", "adet", 180, 60],
+  ["Kimlik Bildirim Formu", "resepsiyon", "adet", 250, 80],
+  ["Çocuk Konaklama Onay Formu", "resepsiyon", "adet", 80, 25],
+  ["Refakatçi Bilgi Formu", "resepsiyon", "adet", 80, 25],
+  ["Oda Değişim Formu", "resepsiyon", "adet", 120, 40],
+  ["Erken Giriş Formu", "resepsiyon", "adet", 100, 35],
+  ["Geç Çıkış Formu", "resepsiyon", "adet", 100, 35],
+  ["No Show Formu", "resepsiyon", "adet", 80, 25],
+  ["Depozito Formu", "resepsiyon", "adet", 120, 40],
+  ["Kasa Teslim Formu", "resepsiyon", "adet", 120, 40],
+  ["Kasa Sayım Formu", "resepsiyon", "adet", 120, 40],
+  ["Tahsilat Makbuzu", "resepsiyon", "koçan", 20, 6],
+  ["İade Makbuzu", "resepsiyon", "koçan", 12, 4],
+  ["Fatura Kağıdı", "resepsiyon", "paket", 20, 6],
+  ["POS Rulosu", "resepsiyon", "rulo", 120, 40],
+  ["Termal Fiş Rulosu", "resepsiyon", "rulo", 100, 35],
+  ["Ön Provizyon Slip Dosyası", "resepsiyon", "adet", 24, 8],
+  ["Kredi Kartı Slip Zarfı", "resepsiyon", "adet", 200, 70],
+  ["Kasa Teslim Zarfı", "resepsiyon", "adet", 200, 70],
+  ["Para Sayma Lastiği", "resepsiyon", "paket", 20, 6],
+  ["Bozuk Para Rulosu", "resepsiyon", "paket", 20, 6],
+  ["A4 Fotokopi Kağıdı", "resepsiyon", "top", 30, 10],
+  ["A5 Kağıt", "resepsiyon", "top", 12, 4],
+  ["Antetli Kağıt", "resepsiyon", "top", 12, 4],
+  ["Not Kağıdı", "resepsiyon", "blok", 80, 25],
+  ["Yapışkan Not", "resepsiyon", "paket", 50, 16],
+  ["Telefon Not Fişi", "resepsiyon", "blok", 60, 20],
+  ["Tükenmez Kalem Mavi", "resepsiyon", "kutu", 20, 6],
+  ["Tükenmez Kalem Siyah", "resepsiyon", "kutu", 16, 5],
+  ["Kurşun Kalem", "resepsiyon", "kutu", 12, 4],
+  ["Fosforlu Kalem", "resepsiyon", "kutu", 10, 3],
+  ["Permanent Marker", "resepsiyon", "kutu", 8, 3],
+  ["Tahta Kalemi", "resepsiyon", "kutu", 8, 3],
+  ["Silgi", "resepsiyon", "adet", 40, 12],
+  ["Kalemtıraş", "resepsiyon", "adet", 20, 6],
+  ["Makas", "resepsiyon", "adet", 12, 4],
+  ["Falçata", "resepsiyon", "adet", 12, 4],
+  ["Zımba Makinesi", "resepsiyon", "adet", 10, 3],
+  ["Zımba Teli", "resepsiyon", "kutu", 40, 12],
+  ["Delgeç", "resepsiyon", "adet", 8, 3],
+  ["Ataş", "resepsiyon", "kutu", 40, 12],
+  ["Kıskaç", "resepsiyon", "kutu", 30, 10],
+  ["Lastik Bant", "resepsiyon", "paket", 20, 6],
+  ["Şeffaf Bant", "resepsiyon", "adet", 40, 12],
+  ["Koli Bandı", "resepsiyon", "adet", 24, 8],
+  ["Çift Taraflı Bant", "resepsiyon", "adet", 20, 6],
+  ["Yapıştırıcı Stick", "resepsiyon", "adet", 30, 10],
+  ["Poşet Dosya", "resepsiyon", "paket", 30, 10],
+  ["Telli Dosya", "resepsiyon", "adet", 120, 40],
+  ["Klasör", "resepsiyon", "adet", 80, 25],
+  ["Arşiv Kutusu", "resepsiyon", "adet", 40, 12],
+  ["Evrak Zarfı Küçük", "resepsiyon", "adet", 300, 100],
+  ["Evrak Zarfı Büyük", "resepsiyon", "adet", 200, 70],
+  ["Balonlu Zarf", "resepsiyon", "adet", 80, 25],
+  ["Kargo Poşeti", "resepsiyon", "adet", 120, 40],
+  ["Kargo Etiketi", "resepsiyon", "rulo", 20, 6],
+  ["Teslim Tesellüm Formu", "resepsiyon", "adet", 160, 50],
+  ["Emanet Eşya Formu", "resepsiyon", "adet", 120, 40],
+  ["Kayıp Eşya Formu", "resepsiyon", "adet", 120, 40],
+  ["Kayıp Eşya Etiketi", "resepsiyon", "adet", 200, 70],
+  ["Arıza Bildirim Formu", "resepsiyon", "adet", 180, 60],
+  ["Misafir Şikayet Formu", "resepsiyon", "adet", 120, 40],
+  ["Misafir Talep Formu", "resepsiyon", "adet", 160, 50],
+  ["Housekeeping Talep Fişi", "resepsiyon", "adet", 160, 50],
+  ["Teknik Servis Talep Fişi", "resepsiyon", "adet", 160, 50],
+  ["Uyandırma Servisi Formu", "resepsiyon", "adet", 120, 40],
+  ["Bagaj Etiketi", "resepsiyon", "adet", 300, 100],
+  ["Bagaj Teslim Fişi", "resepsiyon", "adet", 250, 80],
+  ["Vale Fişi", "resepsiyon", "adet", 250, 80],
+  ["Otopark Kartı", "resepsiyon", "adet", 200, 70],
+  ["Transfer Rezervasyon Formu", "resepsiyon", "adet", 120, 40],
+  ["Taksi Çağrı Kartı", "resepsiyon", "adet", 150, 50],
+  ["Şemsiye Teslim Fişi", "resepsiyon", "adet", 100, 35],
+  ["Bebek Yatağı Talep Formu", "resepsiyon", "adet", 80, 25],
+  ["Ek Yatak Talep Formu", "resepsiyon", "adet", 80, 25],
+  ["Yastık Menü Kartı", "resepsiyon", "adet", 120, 40],
+  ["Wi-Fi Bilgi Kartı", "resepsiyon", "adet", 300, 100],
+  ["Otel Haritası", "resepsiyon", "adet", 250, 80],
+  ["Şehir Haritası", "resepsiyon", "adet", 180, 60],
+  ["Restoran Menü Kartı", "resepsiyon", "adet", 160, 50],
+  ["Oda Servis Menü Kartı", "resepsiyon", "adet", 160, 50],
+  ["Spa Broşürü", "resepsiyon", "adet", 160, 50],
+  ["Plaj Bilgilendirme Kartı", "resepsiyon", "adet", 160, 50],
+  ["Tur Broşürü", "resepsiyon", "adet", 180, 60],
+  ["Misafir Yorum Kartı", "resepsiyon", "adet", 180, 60],
+  ["Karşılama Mektubu", "resepsiyon", "adet", 180, 60],
+  ["Doğum Günü Kartı", "resepsiyon", "adet", 80, 25],
+  ["VIP Karşılama Kartı", "resepsiyon", "adet", 80, 25],
+  ["Acil Durum Bilgi Kartı", "resepsiyon", "adet", 160, 50],
+  ["Yangın Tahliye Planı Kopyası", "resepsiyon", "adet", 80, 25],
+  ["İlk Yardım Seti", "resepsiyon", "set", 6, 2],
+  ["Tek Kullanımlık Maske", "resepsiyon", "kutu", 20, 6],
+  ["El Dezenfektanı Masa Tipi", "resepsiyon", "adet", 24, 8],
+  ["Islak Mendil", "resepsiyon", "paket", 80, 25],
+  ["Kutu Mendil", "resepsiyon", "adet", 80, 25],
+  ["Lobi İkram Şekeri", "resepsiyon", "kg", 12, 4],
+  ["Misafir Kalemi", "resepsiyon", "adet", 200, 70],
+  ["Yaka Kartı", "resepsiyon", "adet", 40, 12],
+  ["Yaka Kartı İpi", "resepsiyon", "adet", 80, 25],
+  ["Resepsiyon Zili", "resepsiyon", "adet", 4, 1],
+  ["Hesap Makinesi", "resepsiyon", "adet", 8, 3],
+  ["AA Pil", "resepsiyon", "paket", 30, 10],
+  ["AAA Pil", "resepsiyon", "paket", 30, 10],
+  ["9V Pil", "resepsiyon", "adet", 12, 4],
+  ["Yazıcı Toneri", "resepsiyon", "adet", 8, 3],
+  ["Yedek Mürekkep Kartuşu", "resepsiyon", "adet", 8, 3],
+  ["Etiket Yazıcı Rulosu", "resepsiyon", "rulo", 20, 6],
+  ["Barkod Etiketi", "resepsiyon", "rulo", 20, 6],
+  ["Telefon Kulaklığı Süngeri", "resepsiyon", "adet", 40, 12],
+  ["Kablo Düzenleyici", "resepsiyon", "paket", 12, 4],
+  ["USB Bellek", "resepsiyon", "adet", 8, 3],
+  ["Masa Üstü Evrak Rafı", "resepsiyon", "adet", 10, 3],
+  ["Gelen Evrak Kaşesi", "resepsiyon", "adet", 4, 1],
+  ["Tarih Kaşesi", "resepsiyon", "adet", 4, 1],
+  ["Kaşe Mürekkebi", "resepsiyon", "adet", 12, 4],
+];
+
+const professionalBufeCatalog = [
+  ["Kola 330 ml", "gulplaj-bufe", "adet", 180, 60],
+  ["Su 500 ml", "gulplaj-bufe", "adet", 260, 100],
+  ["Dondurma", "gulplaj-bufe", "adet", 95, 35],
+  ["Su 330 ml", "gulplaj-bufe", "adet", 240, 80],
+  ["Su 1.5 lt", "gulplaj-bufe", "adet", 120, 40],
+  ["Maden Suyu Sade", "gulplaj-bufe", "adet", 160, 50],
+  ["Maden Suyu Limonlu", "gulplaj-bufe", "adet", 140, 45],
+  ["Soda Meyveli", "gulplaj-bufe", "adet", 120, 40],
+  ["Kola 1 lt", "gulplaj-bufe", "adet", 80, 25],
+  ["Kola Zero 330 ml", "gulplaj-bufe", "adet", 140, 45],
+  ["Gazoz 250 ml", "gulplaj-bufe", "adet", 120, 40],
+  ["Portakallı Gazlı İçecek", "gulplaj-bufe", "adet", 100, 35],
+  ["Limonlu Gazlı İçecek", "gulplaj-bufe", "adet", 100, 35],
+  ["Ice Tea Şeftali", "gulplaj-bufe", "adet", 140, 45],
+  ["Ice Tea Limon", "gulplaj-bufe", "adet", 140, 45],
+  ["Ice Tea Mango", "gulplaj-bufe", "adet", 100, 35],
+  ["Enerji İçeceği", "gulplaj-bufe", "adet", 100, 35],
+  ["Sporcu İçeceği", "gulplaj-bufe", "adet", 80, 25],
+  ["Vitaminli Su", "gulplaj-bufe", "adet", 80, 25],
+  ["Ayran 200 ml", "gulplaj-bufe", "adet", 160, 50],
+  ["Kefir", "gulplaj-bufe", "adet", 60, 20],
+  ["Meyve Suyu Karışık", "gulplaj-bufe", "adet", 100, 35],
+  ["Portakal Suyu Şişe", "gulplaj-bufe", "adet", 90, 30],
+  ["Vişne Suyu", "gulplaj-bufe", "adet", 80, 25],
+  ["Elma Suyu", "gulplaj-bufe", "adet", 80, 25],
+  ["Soğuk Kahve Latte", "gulplaj-bufe", "adet", 90, 30],
+  ["Soğuk Kahve Mocha", "gulplaj-bufe", "adet", 70, 24],
+  ["Protein İçeceği", "gulplaj-bufe", "adet", 48, 16],
+  ["Hindistan Cevizi Suyu", "gulplaj-bufe", "adet", 48, 16],
+  ["Limonata Konsantresi", "gulplaj-bufe", "lt", 30, 10],
+  ["Ev Yapımı Limonata Şişe", "gulplaj-bufe", "adet", 120, 40],
+  ["Taze Limon", "gulplaj-bufe", "kg", 20, 7],
+  ["Taze Nane", "gulplaj-bufe", "bağ", 30, 10],
+  ["Portakal", "gulplaj-bufe", "kg", 24, 8],
+  ["Çilek Püresi", "gulplaj-bufe", "kg", 12, 4],
+  ["Mango Püresi", "gulplaj-bufe", "kg", 10, 4],
+  ["Şeftali Püresi", "gulplaj-bufe", "kg", 10, 4],
+  ["Soğuk İçecek Buzu", "gulplaj-bufe", "kg", 80, 25],
+  ["Buz Torbası 2 kg", "gulplaj-bufe", "adet", 50, 16],
+  ["Espresso Çekirdeği", "gulplaj-bufe", "kg", 18, 6],
+  ["Filtre Kahve", "gulplaj-bufe", "kg", 12, 4],
+  ["Türk Kahvesi", "gulplaj-bufe", "kg", 10, 4],
+  ["Nescafe Classic", "gulplaj-bufe", "kg", 8, 3],
+  ["Nescafe Gold", "gulplaj-bufe", "kg", 8, 3],
+  ["Kapsül Kahve", "gulplaj-bufe", "adet", 120, 40],
+  ["Kafeinsiz Kahve", "gulplaj-bufe", "kg", 4, 2],
+  ["Sıcak Çikolata Tozu", "gulplaj-bufe", "kg", 10, 4],
+  ["Kakao Tozu", "gulplaj-bufe", "kg", 6, 2],
+  ["Chai Tea Latte Tozu", "gulplaj-bufe", "kg", 6, 2],
+  ["Matcha Tozu", "gulplaj-bufe", "kg", 4, 1],
+  ["Süt", "gulplaj-bufe", "lt", 80, 26],
+  ["Laktozsuz Süt", "gulplaj-bufe", "lt", 30, 10],
+  ["Yulaf Sütü", "gulplaj-bufe", "lt", 30, 10],
+  ["Badem Sütü", "gulplaj-bufe", "lt", 20, 7],
+  ["Krema", "gulplaj-bufe", "lt", 24, 8],
+  ["Şanti Sprey", "gulplaj-bufe", "adet", 24, 8],
+  ["Vanilya Şurubu", "gulplaj-bufe", "lt", 12, 4],
+  ["Karamel Şurubu", "gulplaj-bufe", "lt", 12, 4],
+  ["Fındık Şurubu", "gulplaj-bufe", "lt", 10, 4],
+  ["Çikolata Şurubu", "gulplaj-bufe", "lt", 10, 4],
+  ["Çilek Şurubu", "gulplaj-bufe", "lt", 8, 3],
+  ["Karamel Sos", "gulplaj-bufe", "kg", 10, 4],
+  ["Çikolata Sos", "gulplaj-bufe", "kg", 10, 4],
+  ["Beyaz Çikolata Sos", "gulplaj-bufe", "kg", 8, 3],
+  ["Stick Şeker", "gulplaj-bufe", "kutu", 40, 12],
+  ["Esmer Şeker Stick", "gulplaj-bufe", "kutu", 24, 8],
+  ["Tatlandırıcı Stick", "gulplaj-bufe", "kutu", 20, 7],
+  ["Tarçın", "gulplaj-bufe", "kg", 3, 1],
+  ["Çikolata Parça", "gulplaj-bufe", "kg", 6, 2],
+  ["Marshmallow", "gulplaj-bufe", "paket", 24, 8],
+  ["Sıcak İçecek Karton Bardak 8 oz", "gulplaj-bufe", "adet", 500, 160],
+  ["Sıcak İçecek Karton Bardak 12 oz", "gulplaj-bufe", "adet", 500, 160],
+  ["Sıcak Bardak Kapağı", "gulplaj-bufe", "adet", 500, 160],
+  ["Bardak Sleeve", "gulplaj-bufe", "adet", 400, 130],
+  ["Soğuk İçecek Bardağı 16 oz", "gulplaj-bufe", "adet", 500, 160],
+  ["Soğuk İçecek Bardağı 20 oz", "gulplaj-bufe", "adet", 400, 130],
+  ["Soğuk Bardak Düz Kapak", "gulplaj-bufe", "adet", 500, 160],
+  ["Dome Kapak", "gulplaj-bufe", "adet", 300, 100],
+  ["Pipet", "gulplaj-bufe", "paket", 60, 20],
+  ["Karıştırıcı Çubuk", "gulplaj-bufe", "paket", 60, 20],
+  ["Peçete", "gulplaj-bufe", "paket", 120, 40],
+  ["Taşıma Tepsisi", "gulplaj-bufe", "adet", 200, 70],
+  ["Karton Servis Tabağı", "gulplaj-bufe", "adet", 300, 100],
+  ["Karton Kase", "gulplaj-bufe", "adet", 240, 80],
+  ["Plastik Çatal", "gulplaj-bufe", "paket", 80, 25],
+  ["Plastik Kaşık", "gulplaj-bufe", "paket", 80, 25],
+  ["Plastik Bıçak", "gulplaj-bufe", "paket", 50, 16],
+  ["Dondurma Kaşığı", "gulplaj-bufe", "paket", 80, 25],
+  ["Dondurma Külahı", "gulplaj-bufe", "adet", 300, 100],
+  ["Dondurma Kabı", "gulplaj-bufe", "adet", 240, 80],
+  ["Paket Servis Poşeti", "gulplaj-bufe", "adet", 300, 100],
+  ["Kraft Kese Kağıdı", "gulplaj-bufe", "adet", 300, 100],
+  ["Sandviç Kutusu", "gulplaj-bufe", "adet", 200, 70],
+  ["Tost Kutusu", "gulplaj-bufe", "adet", 200, 70],
+  ["Streç Film", "gulplaj-bufe", "rulo", 24, 8],
+  ["Alüminyum Folyo", "gulplaj-bufe", "rulo", 24, 8],
+  ["Buzdolabı Poşeti", "gulplaj-bufe", "rulo", 40, 12],
+  ["Çöp Poşeti Orta", "gulplaj-bufe", "rulo", 60, 20],
+  ["Tek Kullanımlık Eldiven", "gulplaj-bufe", "kutu", 60, 20],
+  ["Gıda Etiketi", "gulplaj-bufe", "rulo", 20, 6],
+  ["Cips Klasik", "gulplaj-bufe", "adet", 120, 40],
+  ["Cips Baharatlı", "gulplaj-bufe", "adet", 120, 40],
+  ["Cips Peynirli", "gulplaj-bufe", "adet", 100, 35],
+  ["Tortilla Cips", "gulplaj-bufe", "adet", 90, 30],
+  ["Patlamış Mısır", "gulplaj-bufe", "paket", 80, 25],
+  ["Kraker Tuzlu", "gulplaj-bufe", "adet", 100, 35],
+  ["Kraker Peynirli", "gulplaj-bufe", "adet", 100, 35],
+  ["Çubuk Kraker", "gulplaj-bufe", "adet", 100, 35],
+  ["Bisküvi Sade", "gulplaj-bufe", "adet", 120, 40],
+  ["Bisküvi Kakaolu", "gulplaj-bufe", "adet", 120, 40],
+  ["Gofret", "gulplaj-bufe", "adet", 150, 50],
+  ["Çikolata Bar", "gulplaj-bufe", "adet", 160, 50],
+  ["Bitter Çikolata", "gulplaj-bufe", "adet", 80, 25],
+  ["Sütlü Çikolata", "gulplaj-bufe", "adet", 120, 40],
+  ["Protein Bar", "gulplaj-bufe", "adet", 80, 25],
+  ["Granola Bar", "gulplaj-bufe", "adet", 80, 25],
+  ["Kek", "gulplaj-bufe", "adet", 120, 40],
+  ["Muffin", "gulplaj-bufe", "adet", 80, 25],
+  ["Kruvasan Paketli", "gulplaj-bufe", "adet", 80, 25],
+  ["Sakız", "gulplaj-bufe", "adet", 120, 40],
+  ["Nane Şekeri", "gulplaj-bufe", "adet", 100, 35],
+  ["Jelibon", "gulplaj-bufe", "adet", 80, 25],
+  ["Lolipop", "gulplaj-bufe", "adet", 100, 35],
+  ["Karışık Kuruyemiş", "gulplaj-bufe", "kg", 20, 7],
+  ["Kavrulmuş Fındık", "gulplaj-bufe", "kg", 12, 4],
+  ["Badem", "gulplaj-bufe", "kg", 12, 4],
+  ["Kaju", "gulplaj-bufe", "kg", 10, 4],
+  ["Antep Fıstığı", "gulplaj-bufe", "kg", 10, 4],
+  ["Ay Çekirdeği", "gulplaj-bufe", "kg", 20, 7],
+  ["Kabuklu Fıstık", "gulplaj-bufe", "kg", 18, 6],
+  ["Kuru Meyve Karışık", "gulplaj-bufe", "kg", 12, 4],
+  ["Sandviç Paketli", "gulplaj-bufe", "adet", 60, 20],
+  ["Tost Ekmeği", "gulplaj-bufe", "paket", 30, 10],
+  ["Kaşar Peyniri Dilimli", "gulplaj-bufe", "kg", 12, 4],
+  ["Hindi Füme Dilimli", "gulplaj-bufe", "kg", 10, 4],
+  ["Salam Dilimli", "gulplaj-bufe", "kg", 10, 4],
+  ["Tereyağı Porsiyon", "gulplaj-bufe", "adet", 120, 40],
+  ["Reçel Porsiyon", "gulplaj-bufe", "adet", 120, 40],
+  ["Bal Porsiyon", "gulplaj-bufe", "adet", 100, 35],
+  ["Nutella Porsiyon", "gulplaj-bufe", "adet", 100, 35],
+  ["Instant Noodle", "gulplaj-bufe", "adet", 80, 25],
+  ["Makarna Paket", "gulplaj-bufe", "paket", 40, 12],
+  ["Ton Balığı Konservesi", "gulplaj-bufe", "adet", 48, 16],
+  ["Mısır Konservesi", "gulplaj-bufe", "adet", 36, 12],
+  ["Çorba Hazır Paket", "gulplaj-bufe", "adet", 50, 16],
+  ["Ekmek", "gulplaj-bufe", "adet", 60, 20],
+  ["Simit", "gulplaj-bufe", "adet", 80, 25],
+  ["Poğaça", "gulplaj-bufe", "adet", 80, 25],
+  ["Küçük Süt UHT", "gulplaj-bufe", "adet", 80, 25],
+  ["Mısır Gevreği", "gulplaj-bufe", "paket", 24, 8],
+  ["Pirinç", "gulplaj-bufe", "kg", 20, 7],
+  ["Bulgur", "gulplaj-bufe", "kg", 20, 7],
+  ["Toz Şeker Paket", "gulplaj-bufe", "kg", 30, 10],
+  ["Tuz Paket", "gulplaj-bufe", "kg", 12, 4],
+  ["Zeytinyağı 1 lt", "gulplaj-bufe", "adet", 24, 8],
+  ["Ayçiçek Yağı 1 lt", "gulplaj-bufe", "adet", 24, 8],
+  ["Ketçap Küçük", "gulplaj-bufe", "adet", 60, 20],
+  ["Mayonez Küçük", "gulplaj-bufe", "adet", 60, 20],
+  ["Hardal Küçük", "gulplaj-bufe", "adet", 40, 12],
+  ["Saklama Kabı", "gulplaj-bufe", "adet", 40, 12],
+  ["Kağıt Havlu", "gulplaj-bufe", "paket", 80, 25],
+  ["Islak Mendil", "gulplaj-bufe", "paket", 80, 25],
+  ["Kağıt Mendil", "gulplaj-bufe", "adet", 120, 40],
+  ["El Dezenfektanı", "gulplaj-bufe", "adet", 40, 12],
+  ["Sıvı Sabun", "gulplaj-bufe", "lt", 24, 8],
+  ["Güneş Kremi SPF 30", "gulplaj-bufe", "adet", 40, 12],
+  ["Güneş Kremi SPF 50", "gulplaj-bufe", "adet", 40, 12],
+  ["After Sun Losyon", "gulplaj-bufe", "adet", 30, 10],
+  ["Aloe Vera Jel", "gulplaj-bufe", "adet", 30, 10],
+  ["Dudak Koruyucu", "gulplaj-bufe", "adet", 40, 12],
+  ["Sinek Kovucu Sprey", "gulplaj-bufe", "adet", 30, 10],
+  ["Yara Bandı", "gulplaj-bufe", "kutu", 30, 10],
+  ["Diş Fırçası", "gulplaj-bufe", "adet", 40, 12],
+  ["Diş Macunu Seyahat", "gulplaj-bufe", "adet", 40, 12],
+  ["Şampuan Seyahat", "gulplaj-bufe", "adet", 40, 12],
+  ["Duş Jeli Seyahat", "gulplaj-bufe", "adet", 40, 12],
+  ["Deodorant", "gulplaj-bufe", "adet", 30, 10],
+  ["Tıraş Bıçağı", "gulplaj-bufe", "adet", 40, 12],
+  ["Hijyenik Ped", "gulplaj-bufe", "paket", 30, 10],
+  ["Tampon", "gulplaj-bufe", "paket", 20, 7],
+  ["Bebek Bezi", "gulplaj-bufe", "paket", 20, 7],
+  ["Bebek Islak Mendili", "gulplaj-bufe", "paket", 30, 10],
+  ["Kulak Tıkacı", "gulplaj-bufe", "adet", 40, 12],
+  ["Plaj Terliği", "gulplaj-bufe", "çift", 30, 10],
+  ["Plaj Havlusu", "gulplaj-bufe", "adet", 40, 12],
+  ["Şapka", "gulplaj-bufe", "adet", 30, 10],
+  ["Güneş Gözlüğü", "gulplaj-bufe", "adet", 24, 8],
+  ["Deniz Gözlüğü", "gulplaj-bufe", "adet", 24, 8],
+  ["Kolluk", "gulplaj-bufe", "çift", 24, 8],
+  ["Şişme Deniz Topu", "gulplaj-bufe", "adet", 30, 10],
+  ["Su Geçirmez Telefon Kılıfı", "gulplaj-bufe", "adet", 30, 10],
+  ["Telefon Şarj Kablosu Type-C", "gulplaj-bufe", "adet", 20, 7],
+  ["Telefon Şarj Kablosu Lightning", "gulplaj-bufe", "adet", 20, 7],
+  ["Powerbank", "gulplaj-bufe", "adet", 10, 3],
+  ["Çakmak", "gulplaj-bufe", "adet", 60, 20],
+  ["Oyun Kartı", "gulplaj-bufe", "adet", 20, 7],
+  ["Plaj Oyuncağı Seti", "gulplaj-bufe", "adet", 20, 7],
+];
+
+const professionalSmileFoodHouseCatalog = [
+  ["Sandviç Ekmeği", "smile-food-house", "adet", 70, 25],
+  ["Patates", "smile-food-house", "kg", 45, 18],
+  ["Ketçap", "smile-food-house", "adet", 24, 8],
+  ["Hamburger Ekmeği", "smile-food-house", "adet", 160, 55],
+  ["Brioche Burger Ekmeği", "smile-food-house", "adet", 90, 30],
+  ["Mini Burger Ekmeği", "smile-food-house", "adet", 120, 40],
+  ["Tost Ekmeği", "smile-food-house", "adet", 180, 60],
+  ["Ayvalık Tost Ekmeği", "smile-food-house", "adet", 120, 40],
+  ["Tortilla Lavaş", "smile-food-house", "paket", 45, 15],
+  ["Wrap Lavaş", "smile-food-house", "paket", 38, 12],
+  ["Sosisli Ekmeği", "smile-food-house", "adet", 90, 30],
+  ["Dana Burger Köftesi", "smile-food-house", "kg", 42, 16],
+  ["Tavuk Burger Köftesi", "smile-food-house", "kg", 34, 12],
+  ["Vegan Burger Köftesi", "smile-food-house", "adet", 50, 18],
+  ["Dana Kıyma", "smile-food-house", "kg", 28, 10],
+  ["Tavuk Göğüs", "smile-food-house", "kg", 36, 14],
+  ["Tavuk Şerit", "smile-food-house", "kg", 28, 10],
+  ["Tavuk Nugget", "smile-food-house", "kg", 30, 12],
+  ["Tavuk Schnitzel", "smile-food-house", "kg", 26, 10],
+  ["Fajita Dana Eti", "smile-food-house", "kg", 24, 9],
+  ["Fajita Tavuk Eti", "smile-food-house", "kg", 30, 12],
+  ["Köfte", "smile-food-house", "kg", 26, 10],
+  ["Sosis", "smile-food-house", "kg", 22, 8],
+  ["Sucuk", "smile-food-house", "kg", 20, 8],
+  ["Hindi Füme", "smile-food-house", "kg", 12, 5],
+  ["Salam", "smile-food-house", "kg", 14, 5],
+  ["Jambon", "smile-food-house", "kg", 12, 5],
+  ["Ton Balığı Konservesi", "smile-food-house", "adet", 36, 12],
+  ["Cheddar Dilim", "smile-food-house", "paket", 55, 18],
+  ["Kaşar Peyniri", "smile-food-house", "kg", 26, 10],
+  ["Mozzarella", "smile-food-house", "kg", 18, 7],
+  ["Parmesan", "smile-food-house", "kg", 8, 3],
+  ["Beyaz Peynir", "smile-food-house", "kg", 10, 4],
+  ["Tulum Peyniri", "smile-food-house", "kg", 8, 3],
+  ["Labne", "smile-food-house", "kg", 10, 4],
+  ["Krema", "smile-food-house", "lt", 28, 10],
+  ["Süt", "smile-food-house", "lt", 36, 12],
+  ["Tereyağı", "smile-food-house", "kg", 12, 5],
+  ["Yumurta", "smile-food-house", "adet", 180, 60],
+  ["Marul", "smile-food-house", "adet", 42, 15],
+  ["Iceberg", "smile-food-house", "adet", 36, 12],
+  ["Roka", "smile-food-house", "bağ", 24, 8],
+  ["Akdeniz Yeşillik", "smile-food-house", "kg", 18, 7],
+  ["Domates", "smile-food-house", "kg", 42, 15],
+  ["Cherry Domates", "smile-food-house", "kg", 12, 5],
+  ["Salatalık", "smile-food-house", "kg", 24, 8],
+  ["Salatalık Turşusu", "smile-food-house", "kg", 18, 7],
+  ["Kornişon Turşu", "smile-food-house", "kg", 16, 6],
+  ["Karamelize Soğan", "smile-food-house", "kg", 10, 4],
+  ["Kırmızı Soğan", "smile-food-house", "kg", 14, 5],
+  ["Soğan", "smile-food-house", "kg", 24, 8],
+  ["Jalapeno", "smile-food-house", "kg", 10, 4],
+  ["Mantar", "smile-food-house", "kg", 18, 7],
+  ["Avokado", "smile-food-house", "adet", 30, 10],
+  ["Kapya Biber", "smile-food-house", "kg", 18, 7],
+  ["Yeşil Biber", "smile-food-house", "kg", 18, 7],
+  ["Sarı Biber", "smile-food-house", "kg", 12, 5],
+  ["Mısır", "smile-food-house", "kg", 14, 5],
+  ["Siyah Fasulye", "smile-food-house", "kg", 10, 4],
+  ["Kırmızı Fasulye", "smile-food-house", "kg", 10, 4],
+  ["Zeytin Dilimi", "smile-food-house", "kg", 10, 4],
+  ["Kurutulmuş Domates", "smile-food-house", "kg", 6, 2],
+  ["Taze Fesleğen", "smile-food-house", "bağ", 18, 6],
+  ["Mayonez", "smile-food-house", "adet", 30, 10],
+  ["Hardal", "smile-food-house", "adet", 18, 6],
+  ["BBQ Sos", "smile-food-house", "adet", 24, 8],
+  ["Ranch Sos", "smile-food-house", "adet", 20, 7],
+  ["Buffalo Sos", "smile-food-house", "adet", 18, 6],
+  ["Acı Sos", "smile-food-house", "adet", 18, 6],
+  ["Sweet Chili Sos", "smile-food-house", "adet", 18, 6],
+  ["Sriracha", "smile-food-house", "adet", 12, 4],
+  ["Chipotle Sos", "smile-food-house", "adet", 12, 4],
+  ["Burger Sos", "smile-food-house", "adet", 24, 8],
+  ["Trüf Mayonez", "smile-food-house", "adet", 10, 4],
+  ["Sarımsaklı Mayonez", "smile-food-house", "adet", 14, 5],
+  ["Pesto Sos", "smile-food-house", "kg", 8, 3],
+  ["Domates Sos", "smile-food-house", "kg", 22, 8],
+  ["Napoliten Sos", "smile-food-house", "kg", 18, 7],
+  ["Arrabbiata Sos", "smile-food-house", "kg", 14, 5],
+  ["Alfredo Sos", "smile-food-house", "kg", 14, 5],
+  ["Krema Bazlı Makarna Sosu", "smile-food-house", "kg", 14, 5],
+  ["Bolonez Sos", "smile-food-house", "kg", 16, 6],
+  ["Mantar Sos", "smile-food-house", "kg", 12, 5],
+  ["Fesleğen Sos", "smile-food-house", "kg", 10, 4],
+  ["Teriyaki Sos", "smile-food-house", "adet", 10, 4],
+  ["Soya Sos", "smile-food-house", "adet", 10, 4],
+  ["Worcestershire Sos", "smile-food-house", "adet", 8, 3],
+  ["Salsa Sos", "smile-food-house", "kg", 10, 4],
+  ["Guacamole", "smile-food-house", "kg", 8, 3],
+  ["Ekşi Krema", "smile-food-house", "kg", 8, 3],
+  ["Domates Salçası", "smile-food-house", "kg", 10, 4],
+  ["Biber Salçası", "smile-food-house", "kg", 8, 3],
+  ["Spaghetti", "smile-food-house", "paket", 45, 15],
+  ["Penne", "smile-food-house", "paket", 55, 18],
+  ["Fettuccine", "smile-food-house", "paket", 34, 12],
+  ["Fusilli", "smile-food-house", "paket", 30, 10],
+  ["Tagliatelle", "smile-food-house", "paket", 24, 8],
+  ["Mac and Cheese Makarna", "smile-food-house", "paket", 24, 8],
+  ["Lazanya Yaprağı", "smile-food-house", "paket", 18, 6],
+  ["Ravioli", "smile-food-house", "kg", 12, 5],
+  ["Fajita Baharatı", "smile-food-house", "kg", 8, 3],
+  ["Taco Baharatı", "smile-food-house", "kg", 6, 2],
+  ["Kajun Baharatı", "smile-food-house", "kg", 7, 3],
+  ["Köri", "smile-food-house", "kg", 5, 2],
+  ["Paprika", "smile-food-house", "kg", 5, 2],
+  ["Kimyon", "smile-food-house", "kg", 5, 2],
+  ["Kekik", "smile-food-house", "kg", 5, 2],
+  ["Pul Biber", "smile-food-house", "kg", 5, 2],
+  ["Karabiber", "smile-food-house", "kg", 5, 2],
+  ["Tuz", "smile-food-house", "kg", 18, 6],
+  ["Toz Sarımsak", "smile-food-house", "kg", 5, 2],
+  ["Toz Soğan", "smile-food-house", "kg", 5, 2],
+  ["Susam", "smile-food-house", "kg", 6, 2],
+  ["Un", "smile-food-house", "kg", 24, 8],
+  ["Galeta Unu", "smile-food-house", "kg", 12, 4],
+  ["Panko", "smile-food-house", "kg", 10, 4],
+  ["Ayçiçek Yağı", "smile-food-house", "lt", 45, 15],
+  ["Zeytinyağı", "smile-food-house", "lt", 18, 6],
+  ["Kızartma Yağı", "smile-food-house", "lt", 80, 25],
+  ["Patates Kızartması", "smile-food-house", "kg", 55, 20],
+  ["Elma Dilim Patates", "smile-food-house", "kg", 36, 12],
+  ["Kajun Baharatlı Patates", "smile-food-house", "kg", 30, 10],
+  ["Soğan Halkası", "smile-food-house", "kg", 24, 8],
+  ["Mozzarella Stick", "smile-food-house", "kg", 20, 7],
+  ["Tortilla Cips", "smile-food-house", "paket", 28, 10],
+  ["Coleslaw Karışımı", "smile-food-house", "kg", 16, 6],
+  ["Amerikan Salatası", "smile-food-house", "kg", 14, 5],
+  ["Mısır Salata", "smile-food-house", "kg", 14, 5],
+  ["Sezar Sos", "smile-food-house", "adet", 12, 4],
+  ["Kruton", "smile-food-house", "paket", 18, 6],
+  ["Zeytin Ezmesi", "smile-food-house", "kg", 8, 3],
+  ["Brownie", "smile-food-house", "adet", 60, 20],
+  ["Cheesecake", "smile-food-house", "adet", 45, 15],
+  ["Waffle Hamuru", "smile-food-house", "kg", 18, 6],
+  ["Nutella", "smile-food-house", "kg", 10, 4],
+  ["Muz", "smile-food-house", "kg", 16, 6],
+  ["Çilek", "smile-food-house", "kg", 12, 5],
+  ["Dondurma Top", "smile-food-house", "adet", 90, 30],
+  ["Çikolata Parça", "smile-food-house", "kg", 8, 3],
+  ["Kola 330 ml", "smile-food-house", "adet", 180, 60],
+  ["Kola Zero 330 ml", "smile-food-house", "adet", 120, 40],
+  ["Gazoz", "smile-food-house", "adet", 90, 30],
+  ["Ayran", "smile-food-house", "adet", 140, 50],
+  ["Su 500 ml", "smile-food-house", "adet", 220, 80],
+  ["Maden Suyu", "smile-food-house", "adet", 110, 40],
+  ["Ice Tea", "smile-food-house", "adet", 120, 40],
+  ["Limonata", "smile-food-house", "lt", 40, 15],
+  ["Milkshake Bazı", "smile-food-house", "lt", 18, 6],
+  ["Milkshake Çikolata", "smile-food-house", "lt", 14, 5],
+  ["Milkshake Çilek", "smile-food-house", "lt", 14, 5],
+  ["Burger Kutusu", "smile-food-house", "adet", 300, 100],
+  ["Patates Kutusu", "smile-food-house", "adet", 260, 90],
+  ["Makarna Kutusu", "smile-food-house", "adet", 220, 80],
+  ["Salata Kasesi", "smile-food-house", "adet", 160, 60],
+  ["Sos Kabı", "smile-food-house", "adet", 500, 180],
+  ["Paket Servis Poşeti", "smile-food-house", "adet", 300, 100],
+  ["Kraft Kese Kağıdı", "smile-food-house", "adet", 250, 90],
+  ["Karton Bardak", "smile-food-house", "adet", 260, 90],
+  ["Bardak Kapağı", "smile-food-house", "adet", 260, 90],
+  ["Pipet", "smile-food-house", "adet", 500, 180],
+  ["Peçete", "smile-food-house", "paket", 90, 30],
+  ["Islak Mendil", "smile-food-house", "paket", 80, 25],
+  ["Tek Kullanımlık Çatal", "smile-food-house", "adet", 300, 100],
+  ["Tek Kullanımlık Kaşık", "smile-food-house", "adet", 250, 90],
+  ["Tek Kullanımlık Bıçak", "smile-food-house", "adet", 250, 90],
+  ["Eldiven", "smile-food-house", "kutu", 40, 12],
+  ["Bone", "smile-food-house", "paket", 35, 10],
+  ["Gıda Etiketi", "smile-food-house", "rulo", 30, 10],
+  ["Streç Film", "smile-food-house", "rulo", 36, 12],
+  ["Alüminyum Folyo", "smile-food-house", "rulo", 30, 10],
+  ["Pişirme Kağıdı", "smile-food-house", "rulo", 24, 8],
+  ["Çöp Poşeti", "smile-food-house", "rulo", 45, 15],
+  ["Yağ Çöz Sıvı", "smile-food-house", "lt", 20, 7],
+  ["Fritöz Filtre Kağıdı", "smile-food-house", "paket", 18, 6],
+  ["Izgara Yağ Sıyırıcı", "smile-food-house", "adet", 12, 4],
+  ["Termal Fiş Rulosu", "smile-food-house", "rulo", 45, 15],
+  ["POS Rulosu", "smile-food-house", "rulo", 45, 15],
+];
+
 const seedProducts = [
   ["Çamaşır Deterjanı", "temizlik", "kg", 35, 12],
   ["Yüzey Temizleyici", "temizlik", "lt", 24, 10],
@@ -447,7 +966,7 @@ const seedProducts = [
 
 const defaultMailSettings = {
   reminder: {
-    recipients: "temizlik@otel.com, mutfak@otel.com, bufe@otel.com, resepsiyon@otel.com",
+    recipients: "temizlik@otel.com, mutfak@otel.com, bufe@otel.com, smile@otel.com, resepsiyon@otel.com",
     sendTime: "18:00",
     subject: "Stok sayım hatırlatma",
     message: "Lütfen gün sonu stok sayımınızı sisteme giriniz.",
@@ -471,6 +990,7 @@ const state = {
   products: load("hotel-stock-products", seedProducts),
   counts: load("hotel-stock-counts", {}),
   mailSettings: normalizeMailSettings(load("hotel-stock-mail-settings", defaultMailSettings)),
+  mailStatus: null,
 };
 
 state.products = ensureProfessionalProductCatalogs(state.products);
@@ -488,7 +1008,9 @@ function todayKey() {
 }
 
 const app = document.querySelector("#app");
-const backendEnabled = location.protocol === "http:" || location.protocol === "https:";
+const localBackendUrl = "http://127.0.0.1:8787";
+const backendBaseUrl = location.protocol === "file:" ? localBackendUrl : "";
+const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol);
 
 async function apiRequest(path, options = {}) {
   if (!backendEnabled) return null;
@@ -499,7 +1021,7 @@ async function apiRequest(path, options = {}) {
   if (state.sessionToken) {
     headers.Authorization = `Bearer ${state.sessionToken}`;
   }
-  const response = await fetch(path, {
+  const response = await fetch(`${backendBaseUrl}${path}`, {
     ...options,
     headers,
   });
@@ -526,9 +1048,32 @@ async function syncFromBackend() {
     save("hotel-stock-products", state.products);
     save("hotel-stock-counts", state.counts);
     save("hotel-stock-mail-settings", state.mailSettings);
+    await refreshMailStatus(false);
     render();
   } catch (error) {
     console.warn("Backend bağlantısı kurulamadı, yerel demo modu kullanılacak.", error);
+  }
+}
+
+async function refreshMailStatus(renderAfter = false) {
+  if (!backendEnabled || state.user?.role !== "admin") {
+    state.mailStatus = null;
+    return null;
+  }
+
+  try {
+    state.mailStatus = await apiRequest("/api/mail/status");
+    if (renderAfter) render();
+    return state.mailStatus;
+  } catch (error) {
+    state.mailStatus = {
+      smtp: { ok: false, enabled: false, message: `Backend mail durumu okunamadı. ${localBackendUrl} adresinde backend açık olmalı.` },
+      automation: {},
+      mailLog: [],
+    };
+    console.warn("Mail durumu okunamadı.", error);
+    if (renderAfter) render();
+    return null;
   }
 }
 
@@ -556,6 +1101,9 @@ function ensureProfessionalProductCatalogs(products) {
   const catalogs = [
     { prefix: "temizlik", items: professionalCleaningCatalog },
     { prefix: "mutfak", items: professionalKitchenCatalog },
+    { prefix: "resepsiyon", items: professionalReceptionCatalog },
+    { prefix: "bufe", items: professionalBufeCatalog },
+    { prefix: "smile", items: professionalSmileFoodHouseCatalog },
   ];
 
   catalogs.forEach(({ prefix, items }) => {
@@ -697,6 +1245,20 @@ function render() {
       </section>
     </div>
   `;
+}
+
+function restoreSearchFocus(selectionStart, selectionEnd) {
+  const searchInput = app.querySelector('[data-action="search"]');
+  if (!searchInput) return;
+
+  try {
+    searchInput.focus({ preventScroll: true });
+  } catch {
+    searchInput.focus();
+  }
+  if (typeof searchInput.setSelectionRange === "function") {
+    searchInput.setSelectionRange(selectionStart ?? searchInput.value.length, selectionEnd ?? searchInput.value.length);
+  }
 }
 
 function navButton(view, label) {
@@ -980,58 +1542,88 @@ function reportRows(date = state.reportDate) {
     .join("");
 }
 
+function buildDailyReportSnapshot(date = state.reportDate, departmentId = state.selectedDepartment) {
+  const departmentList = visibleDepartments().filter((department) => departmentId === "all" || department.id === departmentId);
+  const productStates = state.products
+    .filter((product) => product.active)
+    .filter((product) => departmentId === "all" || product.departmentId === departmentId)
+    .map((product) => {
+      const count = getCount(product.id, date);
+      const qty = count ? Number(count.qty) : Number(product.lastQty);
+      return { product, count, qty };
+    });
+  const criticalItems = productStates.filter((item) => item.qty <= Number(item.product.minQty));
+  const manualRequests = productStates.filter((item) => item.count?.orderRequest?.requested);
+  const notCounted = productStates.filter((item) => !item.count);
+  const departmentSummaries = departmentList.map((department) => {
+    const products = productStates.filter((item) => item.product.departmentId === department.id);
+    const counted = products.filter((item) => item.count).length;
+    const critical = products.filter((item) => item.qty <= Number(item.product.minQty)).length;
+    const manual = products.filter((item) => item.count?.orderRequest?.requested).length;
+    const completion = products.length ? Math.round((counted / products.length) * 100) : 0;
+    return { department, products: products.length, counted, missing: Math.max(products.length - counted, 0), critical, manual, completion };
+  });
+
+  return {
+    date,
+    productStates,
+    criticalItems,
+    manualRequests,
+    notCounted,
+    departmentSummaries,
+  };
+}
+
 function buildMailReport() {
-  const date = state.reportDate;
+  const snapshot = buildDailyReportSnapshot();
   const lines = [
     state.mailSettings.report.subject,
-    `Tarih: ${date}`,
+    `Tarih: ${snapshot.date}`,
     `Alıcılar: ${state.mailSettings.report.recipients}`,
     `Gönderim saati: ${state.mailSettings.report.sendTime}`,
     "",
-    "Sipariş verilmesi gereken ürünler:",
+    "Özet:",
+    `- Aktif ürün: ${snapshot.productStates.length}`,
+    `- Sayılan ürün: ${snapshot.productStates.length - snapshot.notCounted.length}`,
+    `- Sayımı eksik ürün: ${snapshot.notCounted.length}`,
+    `- Kritik stok: ${snapshot.criticalItems.length}`,
+    `- Manuel sipariş talebi: ${snapshot.manualRequests.length}`,
     "",
+    "Departman durumu:",
   ];
-  let orderCount = 0;
-  const manualRequests = [];
 
-  visibleDepartments()
-    .filter((department) => state.selectedDepartment === "all" || department.id === state.selectedDepartment)
-    .forEach((department) => {
-      const activeProducts = state.products
-        .filter((product) => product.departmentId === department.id && product.active)
-        .map((product) => {
-          const count = getCount(product.id, state.reportDate);
-          const qty = count ? count.qty : product.lastQty;
-          return { product, count, qty };
-        });
-      const criticalProducts = activeProducts.filter((item) => item.qty <= item.product.minQty);
-      activeProducts
-        .filter((item) => item.count?.orderRequest?.requested)
-        .forEach((item) => manualRequests.push({ ...item, department }));
+  snapshot.departmentSummaries.forEach((item) => {
+    lines.push(`- ${departmentStockTitle(item.department)}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Kritik: ${item.critical} | Manuel talep: ${item.manual}`);
+  });
 
-      if (criticalProducts.length > 0) {
-        lines.push(department.name);
-        criticalProducts.forEach(({ product, count, qty }) => {
-          const note = count?.note ? ` | Not: ${count.note}` : "";
-          lines.push(`- ${product.name}: ${qty} ${product.unit} | Minimum: ${product.minQty} | Sipariş gerekli${note}`);
-          orderCount += 1;
-        });
-        lines.push("");
-      }
-    });
+  lines.push("");
+  lines.push("Sipariş verilmesi gereken ürünler:");
+  lines.push("");
 
-  if (orderCount === 0) {
+  if (snapshot.criticalItems.length === 0) {
     lines.push("Bugün minimum stok seviyesinin altında ürün bulunmuyor.");
     lines.push("");
+  } else {
+    snapshot.departmentSummaries.forEach(({ department }) => {
+      const departmentItems = snapshot.criticalItems.filter((item) => item.product.departmentId === department.id);
+      if (departmentItems.length === 0) return;
+      lines.push(departmentStockTitle(department));
+      departmentItems.forEach(({ product, count, qty }) => {
+        const note = count?.note ? ` | Not: ${count.note}` : "";
+        lines.push(`- ${product.name}: ${qty} ${product.unit} | Minimum: ${product.minQty} | Sipariş gerekli${note}`);
+      });
+      lines.push("");
+    });
   }
 
   lines.push("Manuel sipariş talepleri:");
   lines.push("");
 
-  if (manualRequests.length === 0) {
+  if (snapshot.manualRequests.length === 0) {
     lines.push("Yeterli stokta olup ayrıca sipariş talep edilen ürün yok.");
   } else {
-    manualRequests.forEach(({ product, count, qty, department }) => {
+    snapshot.manualRequests.forEach(({ product, count, qty }) => {
+      const department = departments.find((item) => item.id === product.departmentId) || { id: product.departmentId, name: departmentName(product.departmentId) };
       const request = count.orderRequest;
       const requestedQty = request.qty ? ` | Talep miktarı: ${request.qty} ${product.unit}` : "";
       const reason = request.reason ? ` | Gerekçe: ${request.reason}` : "";
@@ -1039,19 +1631,35 @@ function buildMailReport() {
     });
   }
 
+  if (snapshot.notCounted.length > 0) {
+    lines.push("");
+    lines.push("Sayımı henüz girilmemiş ilk 25 ürün:");
+    snapshot.notCounted.slice(0, 25).forEach(({ product }) => {
+      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}`);
+    });
+  }
+
   return lines.join("\n");
 }
 
 function buildReminderMail() {
-  return [
+  const snapshot = buildDailyReportSnapshot(todayKey(), "all");
+  const lines = [
     state.mailSettings.reminder.subject,
+    `Tarih: ${todayKey()}`,
     `Alıcılar: ${state.mailSettings.reminder.recipients}`,
     `Gönderim saati: ${state.mailSettings.reminder.sendTime}`,
     "",
     state.mailSettings.reminder.message,
     "",
-    "Departmanlar: Temizlik, Mutfak, Büfe, Smile Food House, Resepsiyon",
-  ].join("\n");
+    "Bugünkü departman sayım durumu:",
+  ];
+
+  snapshot.departmentSummaries.forEach((item) => {
+    lines.push(`- ${departmentStockTitle(item.department)}: ${item.counted}/${item.products} sayıldı | Kalan: ${item.missing}`);
+  });
+
+  return lines.join("\n");
 }
 
 function renderProductsAdmin() {
@@ -1101,7 +1709,7 @@ function renderProductsAdmin() {
 function renderDepartmentStockForms(editingProduct) {
   if (editingProduct) {
     return `
-      <section class="panel">
+      <section class="panel product-form-panel">
         <div class="panel-head">
           <h3 class="panel-title">Ürün düzenle</h3>
           <button class="btn secondary" data-action="cancel-edit">Vazgeç</button>
@@ -1112,14 +1720,12 @@ function renderDepartmentStockForms(editingProduct) {
   }
 
   return `
-    <section class="panel">
+    <section class="panel product-form-panel">
       <div class="panel-head">
-        <h3 class="panel-title">Departmana stok ekle</h3>
-        <span class="badge">Manuel giriş</span>
+        <h3 class="panel-title">Yeni ürün kartı</h3>
+        <span class="badge">Manuel stok</span>
       </div>
-      <div class="department-stock-sections">
-        ${departments.map((department) => renderDepartmentStockSection(department, department.id === state.openStockDepartmentId)).join("")}
-      </div>
+      ${renderProductForm(state.openStockDepartmentId, null, true)}
     </section>
   `;
 }
@@ -1146,20 +1752,43 @@ function departmentStockTitle(department) {
   return department.name;
 }
 
-function renderProductForm(departmentId, product = null) {
+function renderDepartmentOptions(selectedDepartmentId) {
+  return departments
+    .map((department) => `<option value="${department.id}" ${selectedDepartmentId === department.id ? "selected" : ""}>${departmentStockTitle(department)}</option>`)
+    .join("");
+}
+
+function renderProductDepartmentField(departmentId, product, allowDepartmentSelect) {
+  if (allowDepartmentSelect && !product) {
+    return `
+      <div class="form-row">
+        <label>Departman</label>
+        <select name="departmentId" required data-action="product-department">
+          ${renderDepartmentOptions(departmentId)}
+        </select>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="form-row">
+      <label>Departman</label>
+      <input type="hidden" name="departmentId" value="${departmentId}" />
+      <input value="${escapeHtml(departmentStockTitle(departments.find((department) => department.id === departmentId) || { id: departmentId, name: departmentName(departmentId) }))}" disabled />
+    </div>
+  `;
+}
+
+function renderProductForm(departmentId, product = null, allowDepartmentSelect = false) {
   return `
     <form class="form-body compact-product-form" data-action="product-form">
       <input type="hidden" name="id" value="${product?.id || ""}" />
-      <input type="hidden" name="departmentId" value="${departmentId}" />
       <div class="quick-product-grid">
         <div class="form-row">
           <label>Ürün adı</label>
           <input name="name" required value="${escapeHtml(product?.name || "")}" placeholder="Örn. Çöp poşeti, su, kalem" />
         </div>
-        <div class="form-row">
-          <label>Departman</label>
-          <input value="${escapeHtml(departmentStockTitle(departments.find((department) => department.id === departmentId) || { id: departmentId, name: departmentName(departmentId) }))}" disabled />
-        </div>
+        ${renderProductDepartmentField(departmentId, product, allowDepartmentSelect)}
         <div class="form-row">
           <label>Birim</label>
           <select name="unit" required>
@@ -1174,8 +1803,10 @@ function renderProductForm(departmentId, product = null) {
           <label>Minimum stok</label>
           <input name="minQty" type="number" min="0" step="0.01" required value="${product?.minQty ?? ""}" />
         </div>
+        <div class="form-row product-submit-row">
+          <button class="btn" type="submit">${product ? "Ürünü güncelle" : "Ürünü ekle"}</button>
+        </div>
       </div>
-      <button class="btn" type="submit">${product ? "Ürünü güncelle" : `${departmentStockTitle(departments.find((department) => department.id === departmentId) || { id: departmentId, name: departmentName(departmentId) })} stoğu ekle`}</button>
     </form>
   `;
 }
@@ -1192,9 +1823,96 @@ function renderUnitOptions(selectedUnit = "") {
   return `<option value="" ${normalizedSelected ? "" : "selected"}>Birim seç</option>${options}${custom}`;
 }
 
+function formatMailDate(value) {
+  if (!value) return "Yok";
+  try {
+    return new Date(value).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return String(value);
+  }
+}
+
+function mailStatusBadge(status) {
+  if (!status) return `<span class="badge">Yerel mod</span>`;
+  if (status.smtp?.enabled && status.smtp?.ok) return `<span class="badge ok">SMTP hazır</span>`;
+  if (status.smtp?.enabled && !status.smtp?.ok) return `<span class="badge danger">SMTP hata</span>`;
+  return `<span class="badge">Log modu</span>`;
+}
+
+function renderMailStatusPanel() {
+  const status = state.mailStatus;
+  const smtpMessage = status?.smtp?.message || (backendEnabled ? "Backend mail durumu bekleniyor." : "Yerel dosya modunda gerçek mail gönderimi yapılmaz.");
+  const reminderDelivery = status?.automation?.reminder?.lastDelivery;
+  const reportDelivery = status?.automation?.report?.lastDelivery;
+  return `
+    <section class="panel mail-status-panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Mail merkezi</h3>
+        ${mailStatusBadge(status)}
+      </div>
+      <div class="mail-status-grid">
+        <div>
+          <strong>SMTP</strong>
+          <span>${escapeHtml(smtpMessage)}</span>
+        </div>
+        <div>
+          <strong>Hatırlatma otomasyonu</strong>
+          <span>${escapeHtml(state.mailSettings.reminder.sendTime)} | Son işlem: ${escapeHtml(formatMailDate(reminderDelivery?.at))}</span>
+        </div>
+        <div>
+          <strong>Yönetici raporu</strong>
+          <span>${escapeHtml(state.mailSettings.report.sendTime)} | Son işlem: ${escapeHtml(formatMailDate(reportDelivery?.at))}</span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderMailLogPanel() {
+  const logs = state.mailStatus?.mailLog || [];
+  const rows = logs.map((log) => `
+    <tr>
+      <td data-label="Zaman">${escapeHtml(formatMailDate(log.createdAt))}</td>
+      <td data-label="Tür">${log.kind === "reminder" ? "Hatırlatma" : "Yönetici raporu"}</td>
+      <td data-label="Durum"><span class="badge ${log.status === "sent" ? "ok" : log.status?.includes("error") ? "danger" : ""}">${escapeHtml(log.status || "log")}</span></td>
+      <td data-label="Konu">${escapeHtml(log.subject || "")}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <section class="panel mail-log-panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Son mail işlemleri</h3>
+        <button class="btn secondary" data-action="refresh-mail-status">Yenile</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zaman</th><th>Tür</th><th>Durum</th><th>Konu</th></tr></thead>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="4" class="empty">Henüz mail işlemi yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function backendConnectionMessage() {
+  return `Backend bağlantısı yok. Önce START_BACKEND.cmd dosyasını çalıştır veya siteyi ${localBackendUrl}/ adresinden aç.`;
+}
+
+async function handleMailBackendFailure(kind, error) {
+  const text = kind === "reminder" ? buildReminderMail() : buildMailReport();
+  try {
+    await copyText(text);
+    window.alert(`${backendConnectionMessage()}\n\nMail gerçek gönderilmedi; ${kind === "reminder" ? "hatırlatma" : "rapor"} metni panoya kopyalandı.\n\nTeknik detay: ${error.message || "backend bağlantısı yok"}`);
+  } catch {
+    window.alert(`${backendConnectionMessage()}\n\nMail gerçek gönderilmedi.\n\nTeknik detay: ${error.message || "backend bağlantısı yok"}`);
+  }
+}
+
 function renderMailSettings() {
   return `
     <div class="grid mail-settings-layout">
+      ${renderMailStatusPanel()}
       <section class="panel">
         <div class="panel-head">
           <h3 class="panel-title">Personel hatırlatma maili</h3>
@@ -1270,6 +1988,7 @@ function renderMailSettings() {
         </div>
         <div class="mail-preview">${escapeHtml(buildMailReport())}</div>
       </section>
+      ${renderMailLogPanel()}
     </div>
   `;
 }
@@ -1467,28 +2186,41 @@ app.addEventListener("click", async (event) => {
   if (action === "send-reminder-mail") {
     try {
       const result = await apiRequest("/api/mail/send-reminder", { method: "POST" });
+      if (!result) throw new Error("Backend kapalı.");
+      await refreshMailStatus(false);
       window.alert(result?.message || "Hatırlatma maili işlendi.");
+      render();
     } catch (error) {
-      window.alert("Backend açık değil veya mail gönderimi başarısız.");
+      await handleMailBackendFailure("reminder", error);
     }
   }
 
   if (action === "send-report-mail") {
     try {
       const result = await apiRequest(`/api/mail/send-report?date=${encodeURIComponent(state.reportDate)}`, { method: "POST" });
+      if (!result) throw new Error("Backend kapalı.");
+      await refreshMailStatus(false);
       window.alert(result?.message || "Yönetici raporu işlendi.");
+      render();
     } catch (error) {
-      window.alert("Backend açık değil veya mail gönderimi başarısız.");
+      await handleMailBackendFailure("report", error);
     }
   }
 
   if (action === "verify-smtp") {
     try {
       const result = await apiRequest("/api/mail/verify-smtp", { method: "POST" });
+      if (!result) throw new Error("Backend kapalı.");
+      await refreshMailStatus(false);
       window.alert(result?.message || (result?.enabled ? "SMTP kontrol edildi." : "SMTP kapalı. .env içinde SMTP_ENABLED=true yapılmalı."));
+      render();
     } catch (error) {
-      window.alert("SMTP kontrolü başarısız. Backend açık mı ve SMTP bilgileri doğru mu kontrol et.");
+      window.alert(`${backendConnectionMessage()}\n\nTeknik detay: ${error.message || "SMTP kontrolü başarısız"}`);
     }
+  }
+
+  if (action === "refresh-mail-status") {
+    await refreshMailStatus(true);
   }
 
   if (action === "edit-product") {
@@ -1531,8 +2263,11 @@ app.addEventListener("click", async (event) => {
 
 app.addEventListener("input", (event) => {
   if (event.target.dataset.action === "search") {
+    const selectionStart = event.target.selectionStart;
+    const selectionEnd = event.target.selectionEnd;
     state.search = event.target.value;
     render();
+    restoreSearchFocus(selectionStart, selectionEnd);
   }
 });
 
@@ -1540,6 +2275,10 @@ app.addEventListener("change", (event) => {
   if (event.target.dataset.action === "department") {
     state.selectedDepartment = event.target.value;
     render();
+  }
+
+  if (event.target.dataset.action === "product-department") {
+    state.openStockDepartmentId = event.target.value || state.openStockDepartmentId;
   }
 
   if (event.target.dataset.action === "report-date") {
@@ -1609,10 +2348,15 @@ app.addEventListener("submit", async (event) => {
       },
     };
     save("hotel-stock-mail-settings", state.mailSettings);
-    apiRequest("/api/mail-settings", {
-      method: "PUT",
-      body: JSON.stringify(state.mailSettings),
-    }).catch((error) => console.warn("Mail ayarları backend'e yazılamadı.", error));
+    try {
+      await apiRequest("/api/mail-settings", {
+        method: "PUT",
+        body: JSON.stringify(state.mailSettings),
+      });
+      await refreshMailStatus(false);
+    } catch (error) {
+      console.warn("Mail ayarları backend'e yazılamadı.", error);
+    }
     render();
   }
 });

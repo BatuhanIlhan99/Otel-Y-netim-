@@ -39,14 +39,25 @@ function Copy-ProjectForDeploy {
     "data",
     ".env.example",
     ".gitignore",
+    ".nojekyll",
+    "404.html",
     "app.js",
     "DEPLOY_GITHUB.cmd",
     "DEPLOY_GITHUB.ps1",
     "DEPLOY_GITHUB_TOKEN.cmd",
     "DEPLOY_GITHUB_TOKEN.ps1",
+    "2-PAGESI-YENIDEN-BASLAT.cmd",
+    "2-PAGESI-YENIDEN-BASLAT.ps1",
+    "3-TARAYICIDAN-DEPLOY.html",
+    "4-TEK-TIK-DEPLOY.html",
+    "5-OTOMATIK-DEPLOY.cmd",
+    "5-OTOMATIK-DEPLOY.ps1",
+    "6-OTOMATIK-DEPLOY-IZLE.cmd",
+    "deploy-hotfix.js",
     "GITHUB_YUKLEME.md",
     "index.html",
     "MAIL_KURULUMU.md",
+    "OTOMATIK_DEPLOY.md",
     "package.json",
     "PRODUCTION_CHECKLIST.md",
     "README.md",
@@ -105,10 +116,31 @@ Write-Host "GitHub push icin Personal Access Token gerekecek." -ForegroundColor 
 Write-Host "Token chat'e yazilmayacak; sadece bu pencerede gizli olarak alinacak."
 Write-Host "Token yetkisi: repo veya bu repository icin Contents read/write."
 Write-Host ""
-$secureToken = Read-Host "GitHub token gir" -AsSecureString
-$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
-$plainToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+
+$plainToken = ""
+try {
+  $clipboardText = (Get-Clipboard -Raw -ErrorAction Stop).Trim()
+  $clipboardMatch = [regex]::Match($clipboardText, "(ghp_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)")
+  if ($clipboardMatch.Success) {
+    $plainToken = $clipboardMatch.Value
+    Write-Host "Panodaki GitHub token kullanilacak." -ForegroundColor Green
+  }
+} catch {
+  $plainToken = ""
+}
+
+if (-not $plainToken) {
+  $secureToken = Read-Host "GitHub token gir" -AsSecureString
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+  $plainToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+}
+
+$plainToken = ($plainToken -replace "[\u0000-\u001F\u007F\s]", "").Trim()
+$tokenMatch = [regex]::Match($plainToken, "(ghp_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)")
+if ($tokenMatch.Success) {
+  $plainToken = $tokenMatch.Value
+}
 
 $askPass = Join-Path $env:TEMP "otel-git-askpass-$stamp.ps1"
 @'
@@ -121,14 +153,16 @@ if ($args[0] -match "Username") {
 
 try {
   $env:GIT_ASKPASS = $askPass
+  $env:SSH_ASKPASS = $askPass
   $env:GIT_TERMINAL_PROMPT = "0"
   $env:OTEL_GITHUB_TOKEN = $plainToken
-  & $GitExe --git-dir=$gitDir --work-tree=$workTree -c http.sslBackend=openssl -c credential.helper= push -u origin $Branch
+  & $GitExe --git-dir=$gitDir --work-tree=$workTree -c http.sslBackend=openssl -c credential.helper= -c core.askPass=$askPass push -u origin $Branch
   if ($LASTEXITCODE -ne 0) {
     throw "GitHub push basarisiz oldu."
   }
 } finally {
   Remove-Item Env:\GIT_ASKPASS -ErrorAction SilentlyContinue
+  Remove-Item Env:\SSH_ASKPASS -ErrorAction SilentlyContinue
   Remove-Item Env:\GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
   Remove-Item Env:\OTEL_GITHUB_TOKEN -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $askPass -Force -ErrorAction SilentlyContinue

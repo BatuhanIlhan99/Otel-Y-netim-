@@ -8,17 +8,17 @@ const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, "data");
 const DATA_FILE = path.join(DATA_DIR, "app-data.json");
 const MAIL_LOG_FILE = path.join(DATA_DIR, "mail-log.json");
+const MAIL_STATE_FILE = path.join(DATA_DIR, "mail-state.json");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 const MAX_BODY_BYTES = 1_000_000;
+const MAIL_LOG_LIMIT = 500;
 
 loadEnvFile(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 const sessions = new Map();
-let lastReminderDate = "";
-let lastReportDate = "";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -79,7 +79,7 @@ function backupDataFile() {
 function defaultMailSettings() {
   return {
     reminder: {
-      recipients: "temizlik@otel.com, mutfak@otel.com, bufe@otel.com, resepsiyon@otel.com",
+      recipients: "temizlik@otel.com, mutfak@otel.com, bufe@otel.com, smile@otel.com, resepsiyon@otel.com",
       sendTime: "18:00",
       subject: "Stok sayım hatırlatma",
       message: "Lütfen gün sonu stok sayımınızı sisteme giriniz.",
@@ -150,6 +150,9 @@ function defaultProducts() {
     { prefix: "p", items: readFrontendProductArray("seedProducts") },
     { prefix: "temizlik", items: readFrontendProductArray("professionalCleaningCatalog") },
     { prefix: "mutfak", items: readFrontendProductArray("professionalKitchenCatalog") },
+    { prefix: "resepsiyon", items: readFrontendProductArray("professionalReceptionCatalog") },
+    { prefix: "bufe", items: readFrontendProductArray("professionalBufeCatalog") },
+    { prefix: "smile", items: readFrontendProductArray("professionalSmileFoodHouseCatalog") },
   ];
 
   for (const catalog of catalogs) {
@@ -317,71 +320,170 @@ function allowedProductsForUser(db, user, includeInactive = false) {
   });
 }
 
-function orderItems(db, date, departmentId = "all") {
-  return (db.products || [])
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function parseRecipients(value) {
+  return String(value || "")
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function validateRecipients(recipients) {
+  const recipientList = Array.isArray(recipients) ? recipients : parseRecipients(recipients);
+  const invalid = recipientList.filter((recipient) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient));
+  if (recipientList.length === 0) {
+    return { ok: false, recipients: recipientList, message: "En az bir geçerli alıcı mail adresi gerekli." };
+  }
+  if (invalid.length > 0) {
+    return { ok: false, recipients: recipientList, message: `Geçersiz alıcı adresi: ${invalid.join(", ")}` };
+  }
+  return { ok: true, recipients: recipientList };
+}
+
+function buildDailyReport(db, date, departmentId = "all") {
+  const activeProducts = (db.products || [])
     .filter((product) => product.active !== false)
-    .filter((product) => departmentId === "all" || product.departmentId === departmentId)
-    .map((product) => {
-      const count = getCount(db, date, product.id);
-      const qty = count ? Number(count.qty) : Number(product.lastQty);
+    .filter((product) => departmentId === "all" || product.departmentId === departmentId);
+
+  const productStates = activeProducts.map((product) => {
+    const count = getCount(db, date, product.id);
+    const qty = count ? Number(count.qty) : Number(product.lastQty);
+    const minQty = Number(product.minQty);
+    const request = count?.orderRequest;
+    return {
+      productId: product.id,
+      productName: product.name,
+      departmentId: product.departmentId,
+      departmentName: departmentName(db, product.departmentId),
+      unit: product.unit,
+      qty,
+      minQty,
+      counted: Boolean(count),
+      note: count?.note || "",
+      user: count?.user || "",
+      time: count?.time || "",
+      orderRequest: request?.requested
+        ? {
+            requested: true,
+            requestedQty: Number(request.qty || 0),
+            reason: request.reason || "",
+          }
+        : { requested: false, requestedQty: 0, reason: "" },
+    };
+  });
+
+  const orderItems = productStates
+    .filter((item) => item.qty <= item.minQty)
+    .map(({ orderRequest, ...item }) => item);
+
+  const manualOrderRequests = productStates
+    .filter((item) => item.orderRequest.requested)
+    .map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      departmentId: item.departmentId,
+      departmentName: item.departmentName,
+      unit: item.unit,
+      qty: item.qty,
+      minQty: item.minQty,
+      requestedQty: item.orderRequest.requestedQty,
+      reason: item.orderRequest.reason,
+    }));
+
+  const departmentSummaries = (db.departments || [])
+    .filter((department) => departmentId === "all" || department.id === departmentId)
+    .map((department) => {
+      const products = productStates.filter((item) => item.departmentId === department.id);
+      const counted = products.filter((item) => item.counted).length;
+      const critical = products.filter((item) => item.qty <= item.minQty).length;
+      const manual = products.filter((item) => item.orderRequest.requested).length;
+      const completion = products.length ? Math.round((counted / products.length) * 100) : 0;
       return {
-        productId: product.id,
-        productName: product.name,
-        departmentId: product.departmentId,
-        departmentName: departmentName(db, product.departmentId),
-        unit: product.unit,
-        qty,
-        minQty: Number(product.minQty),
-        note: count?.note || "",
+        departmentId: department.id,
+        departmentName: departmentName(db, department.id),
+        products: products.length,
+        counted,
+        missing: Math.max(products.length - counted, 0),
+        critical,
+        manualRequests: manual,
+        completion,
+        complete: products.length > 0 && counted === products.length,
       };
-    })
-    .filter((item) => item.qty <= item.minQty);
+    });
+
+  const notCountedItems = productStates
+    .filter((item) => !item.counted)
+    .map(({ orderRequest, ...item }) => item);
+
+  return {
+    date,
+    departmentId,
+    generatedAt: new Date().toISOString(),
+    totals: {
+      activeProducts: productStates.length,
+      countedProducts: productStates.filter((item) => item.counted).length,
+      missingCounts: notCountedItems.length,
+      criticalItems: orderItems.length,
+      manualRequests: manualOrderRequests.length,
+      incompleteDepartments: departmentSummaries.filter((item) => !item.complete).length,
+    },
+    departmentSummaries,
+    orderItems,
+    manualOrderRequests,
+    notCountedItems,
+  };
+}
+
+function orderItems(db, date, departmentId = "all") {
+  return buildDailyReport(db, date, departmentId).orderItems;
 }
 
 function manualOrderRequests(db, date, departmentId = "all") {
-  return (db.products || [])
-    .filter((product) => product.active !== false)
-    .filter((product) => departmentId === "all" || product.departmentId === departmentId)
-    .map((product) => {
-      const count = getCount(db, date, product.id);
-      const request = count?.orderRequest;
-      if (!request?.requested) return null;
-      const qty = count ? Number(count.qty) : Number(product.lastQty);
-      return {
-        productId: product.id,
-        productName: product.name,
-        departmentId: product.departmentId,
-        departmentName: departmentName(db, product.departmentId),
-        unit: product.unit,
-        qty,
-        minQty: Number(product.minQty),
-        requestedQty: Number(request.qty || 0),
-        reason: request.reason || "",
-      };
-    })
-    .filter(Boolean);
+  return buildDailyReport(db, date, departmentId).manualOrderRequests;
 }
 
 function buildOrderReportMail(db, date, departmentId = "all") {
   const settings = normalizeMailSettings(db.mailSettings).report;
-  const items = orderItems(db, date, departmentId);
-  const manualItems = manualOrderRequests(db, date, departmentId);
+  const report = buildDailyReport(db, date, departmentId);
   const lines = [
     settings.subject,
     `Tarih: ${date}`,
+    `Oluşturma zamanı: ${new Date(report.generatedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}`,
     `Alıcılar: ${settings.recipients}`,
     `Gönderim saati: ${settings.sendTime}`,
     "",
-    "Sipariş verilmesi gereken ürünler:",
+    "Özet:",
+    `- Aktif ürün: ${report.totals.activeProducts}`,
+    `- Sayılan ürün: ${report.totals.countedProducts}`,
+    `- Sayımı eksik ürün: ${report.totals.missingCounts}`,
+    `- Kritik stok: ${report.totals.criticalItems}`,
+    `- Manuel sipariş talebi: ${report.totals.manualRequests}`,
     "",
+    "Departman durumu:",
   ];
 
-  if (items.length === 0) {
+  for (const item of report.departmentSummaries) {
+    lines.push(`- ${item.departmentName}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Kritik: ${item.critical} | Manuel talep: ${item.manualRequests}`);
+  }
+
+  lines.push("");
+  lines.push("Sipariş verilmesi gereken ürünler:");
+  lines.push("");
+
+  if (report.orderItems.length === 0) {
     lines.push("Bugün minimum stok seviyesinin altında ürün bulunmuyor.");
     lines.push("");
   } else {
     const grouped = new Map();
-    for (const item of items) {
+    for (const item of report.orderItems) {
       if (!grouped.has(item.departmentName)) grouped.set(item.departmentName, []);
       grouped.get(item.departmentName).push(item);
     }
@@ -399,40 +501,173 @@ function buildOrderReportMail(db, date, departmentId = "all") {
   lines.push("Manuel sipariş talepleri:");
   lines.push("");
 
-  if (manualItems.length === 0) {
+  if (report.manualOrderRequests.length === 0) {
     lines.push("Yeterli stokta olup ayrıca sipariş talep edilen ürün yok.");
   } else {
-    for (const item of manualItems) {
+    for (const item of report.manualOrderRequests) {
       const requestedQty = item.requestedQty ? ` | Talep miktarı: ${item.requestedQty} ${item.unit}` : "";
       const reason = item.reason ? ` | Gerekçe: ${item.reason}` : "";
       lines.push(`- ${item.departmentName} / ${item.productName}: mevcut ${item.qty} ${item.unit}${requestedQty}${reason}`);
     }
   }
 
+  if (report.notCountedItems.length > 0) {
+    lines.push("");
+    lines.push("Sayımı henüz girilmemiş ilk 25 ürün:");
+    report.notCountedItems.slice(0, 25).forEach((item) => {
+      lines.push(`- ${item.departmentName} / ${item.productName}`);
+    });
+  }
+
   return lines.join("\n");
+}
+
+function buildOrderReportHtml(db, date, departmentId = "all") {
+  const settings = normalizeMailSettings(db.mailSettings).report;
+  const report = buildDailyReport(db, date, departmentId);
+  const rows = (items, emptyText) => {
+    if (items.length === 0) return `<tr><td colspan="6">${escapeHtml(emptyText)}</td></tr>`;
+    return items.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.departmentName)}</td>
+        <td><strong>${escapeHtml(item.productName)}</strong></td>
+        <td>${escapeHtml(item.qty)} ${escapeHtml(item.unit)}</td>
+        <td>${escapeHtml(item.minQty)}</td>
+        <td>${escapeHtml(item.requestedQty || "")}</td>
+        <td>${escapeHtml(item.reason || item.note || "")}</td>
+      </tr>
+    `).join("");
+  };
+
+  const departmentRows = report.departmentSummaries.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.departmentName)}</td>
+      <td>${item.counted}/${item.products}</td>
+      <td>%${item.completion}</td>
+      <td>${item.critical}</td>
+      <td>${item.manualRequests}</td>
+      <td>${item.complete ? "Tamamlandı" : "Eksik"}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <div style="font-family:Arial,sans-serif;color:#16211f;line-height:1.5">
+      <h2 style="margin:0 0 8px">${escapeHtml(settings.subject)}</h2>
+      <p style="margin:0 0 18px;color:#60716d">Tarih: ${escapeHtml(date)} | Oluşturma: ${escapeHtml(new Date(report.generatedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }))}</p>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
+        <tr style="background:#eef4f2">
+          <th align="left">Aktif ürün</th><th align="left">Sayılan</th><th align="left">Eksik</th><th align="left">Kritik</th><th align="left">Manuel talep</th>
+        </tr>
+        <tr>
+          <td>${report.totals.activeProducts}</td><td>${report.totals.countedProducts}</td><td>${report.totals.missingCounts}</td><td>${report.totals.criticalItems}</td><td>${report.totals.manualRequests}</td>
+        </tr>
+      </table>
+      <h3>Departman durumu</h3>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
+        <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Sayım</th><th align="left">Tamamlanma</th><th align="left">Kritik</th><th align="left">Manuel</th><th align="left">Durum</th></tr>
+        ${departmentRows}
+      </table>
+      <h3>Sipariş verilmesi gereken ürünler</h3>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
+        <tr style="background:#f9e8e8"><th align="left">Departman</th><th align="left">Ürün</th><th align="left">Mevcut</th><th align="left">Minimum</th><th align="left">Talep</th><th align="left">Not</th></tr>
+        ${rows(report.orderItems, "Bugün minimum stok seviyesinin altında ürün bulunmuyor.")}
+      </table>
+      <h3>Manuel sipariş talepleri</h3>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
+        <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Ürün</th><th align="left">Mevcut</th><th align="left">Minimum</th><th align="left">Talep</th><th align="left">Gerekçe</th></tr>
+        ${rows(report.manualOrderRequests, "Yeterli stokta olup ayrıca sipariş talep edilen ürün yok.")}
+      </table>
+    </div>
+  `;
 }
 
 function buildReminderMail(db) {
   const settings = normalizeMailSettings(db.mailSettings).reminder;
-  return [
+  const report = buildDailyReport(db, todayKey(), "all");
+  const lines = [
     settings.subject,
+    `Tarih: ${todayKey()}`,
     `Alıcılar: ${settings.recipients}`,
     `Gönderim saati: ${settings.sendTime}`,
     "",
     settings.message,
     "",
-    "Departmanlar: Temizlik, Mutfak, Büfe, Smile Food House, Resepsiyon",
-  ].join("\n");
+    "Bugünkü departman sayım durumu:",
+  ];
+
+  for (const item of report.departmentSummaries) {
+    lines.push(`- ${item.departmentName}: ${item.counted}/${item.products} sayıldı | Kalan: ${item.missing}`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildReminderHtml(db) {
+  const settings = normalizeMailSettings(db.mailSettings).reminder;
+  const report = buildDailyReport(db, todayKey(), "all");
+  const rows = report.departmentSummaries.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.departmentName)}</td>
+      <td>${item.counted}/${item.products}</td>
+      <td>${item.missing}</td>
+      <td>%${item.completion}</td>
+    </tr>
+  `).join("");
+  return `
+    <div style="font-family:Arial,sans-serif;color:#16211f;line-height:1.5">
+      <h2 style="margin:0 0 8px">${escapeHtml(settings.subject)}</h2>
+      <p>${escapeHtml(settings.message)}</p>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
+        <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Sayım</th><th align="left">Kalan</th><th align="left">Tamamlanma</th></tr>
+        ${rows}
+      </table>
+    </div>
+  `;
 }
 
 function appendMailLog(entry) {
   const log = readJson(MAIL_LOG_FILE, []);
-  log.push({
+  const record = {
     id: `mail-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
     createdAt: new Date().toISOString(),
     ...entry,
-  });
-  writeJsonAtomic(MAIL_LOG_FILE, log);
+  };
+  log.push(record);
+  writeJsonAtomic(MAIL_LOG_FILE, log.slice(-MAIL_LOG_LIMIT));
+  return record;
+}
+
+function readMailState() {
+  const state = readJson(MAIL_STATE_FILE, { deliveries: {} });
+  state.deliveries ||= {};
+  return state;
+}
+
+function writeMailState(state) {
+  writeJsonAtomic(MAIL_STATE_FILE, state);
+}
+
+function deliveryKey(kind, date) {
+  return `${kind}:${date}`;
+}
+
+function markDelivery(kind, date, result) {
+  const state = readMailState();
+  state.deliveries[deliveryKey(kind, date)] = {
+    kind,
+    date,
+    status: result.status || (result.sent ? "sent" : "logged"),
+    message: result.message || "",
+    at: new Date().toISOString(),
+  };
+  writeMailState(state);
+}
+
+function lastDelivery(kind) {
+  const deliveries = Object.values(readMailState().deliveries || {})
+    .filter((item) => item.kind === kind)
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return deliveries[0] || null;
 }
 
 function smtpEnabled() {
@@ -447,57 +682,108 @@ function smtpTransportOptions() {
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || "" }
       : undefined,
+    connectionTimeout: Number(process.env.SMTP_TIMEOUT_MS || 15000),
+    greetingTimeout: Number(process.env.SMTP_TIMEOUT_MS || 15000),
+    socketTimeout: Number(process.env.SMTP_TIMEOUT_MS || 15000),
   };
 }
 
 function validateSmtpConfig() {
-  if (!smtpEnabled()) return { ok: true, enabled: false };
+  if (!smtpEnabled()) return { ok: true, enabled: false, message: "SMTP kapalı; gönderimler mail log dosyasına yazılır." };
   const required = ["SMTP_HOST", "SMTP_FROM"];
   const missing = required.filter((key) => !process.env[key]);
+  if (process.env.SMTP_USER && !process.env.SMTP_PASS) missing.push("SMTP_PASS");
   if (missing.length > 0) {
     return { ok: false, enabled: true, message: `Eksik SMTP ayarı: ${missing.join(", ")}` };
   }
-  return { ok: true, enabled: true };
+  return {
+    ok: true,
+    enabled: true,
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+    from: process.env.SMTP_FROM,
+  };
 }
 
-async function sendMailOrLog(kind, subject, recipients, body) {
+function mailFromAddress() {
+  const from = process.env.SMTP_FROM || "stok@otel.com";
+  const name = process.env.SMTP_FROM_NAME || "Otel Yönetim Stok";
+  return `"${name.replaceAll('"', "'")}" <${from}>`;
+}
+
+async function sendMailOrLog(kind, subject, recipients, body, html = "", metadata = {}) {
+  const recipientValidation = validateRecipients(recipients);
+  if (!recipientValidation.ok) {
+    appendMailLog({ kind, status: "recipient-error", subject, recipients, body, html, error: recipientValidation.message, metadata });
+    return { ok: false, sent: false, logged: true, status: "recipient-error", message: recipientValidation.message };
+  }
+
   const validation = validateSmtpConfig();
   if (!validation.ok) {
-    appendMailLog({ kind, status: "config-error", subject, recipients, body, error: validation.message });
-    return { sent: false, logged: true, message: validation.message };
+    appendMailLog({ kind, status: "config-error", subject, recipients: recipientValidation.recipients, body, html, error: validation.message, metadata });
+    return { ok: false, sent: false, logged: true, status: "config-error", message: validation.message };
   }
 
   if (!smtpEnabled()) {
-    appendMailLog({ kind, status: "logged", subject, recipients, body });
-    return { sent: false, logged: true, message: "SMTP kapalı, mail log dosyasına yazıldı." };
+    appendMailLog({ kind, status: "logged", subject, recipients: recipientValidation.recipients, body, html, metadata });
+    return { ok: true, sent: false, logged: true, status: "logged", message: "SMTP kapalı, mail log dosyasına yazıldı." };
   }
 
-  const transporter = nodemailer.createTransport(smtpTransportOptions());
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || "stok@otel.com",
-    to: recipients,
-    subject,
-    text: body,
-  });
-  appendMailLog({ kind, status: "sent", subject, recipients, body });
-  return { sent: true, logged: true, message: "Mail gönderildi." };
+  try {
+    const transporter = nodemailer.createTransport(smtpTransportOptions());
+    const info = await transporter.sendMail({
+      from: mailFromAddress(),
+      to: recipientValidation.recipients,
+      subject,
+      text: body,
+      html: html || undefined,
+    });
+    appendMailLog({ kind, status: "sent", subject, recipients: recipientValidation.recipients, body, html, messageId: info.messageId, metadata });
+    return { ok: true, sent: true, logged: true, status: "sent", message: "Mail gönderildi.", messageId: info.messageId };
+  } catch (error) {
+    appendMailLog({ kind, status: "send-error", subject, recipients: recipientValidation.recipients, body, html, error: error.message, metadata });
+    return { ok: false, sent: false, logged: true, status: "send-error", message: `Mail gönderilemedi: ${error.message}` };
+  }
+}
+
+function minuteOfDay(value) {
+  const [hour, minute] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function isAutomationDue(sendTime, now = timeKey()) {
+  const sendMinute = minuteOfDay(sendTime);
+  const nowMinute = minuteOfDay(now);
+  if (sendMinute === null || nowMinute === null) return false;
+  const windowMinutes = Number(process.env.MAIL_CATCH_UP_MINUTES || 120);
+  const diff = nowMinute - sendMinute;
+  return diff >= 0 && diff <= windowMinutes;
+}
+
+function shouldRunAutomation(kind, date, sendTime) {
+  const state = readMailState();
+  return !state.deliveries[deliveryKey(kind, date)] && isAutomationDue(sendTime);
 }
 
 async function runDueAutomations() {
   const db = loadDb();
-  const now = timeKey();
+  db.mailSettings = normalizeMailSettings(db.mailSettings);
   const today = todayKey();
 
-  if (db.mailSettings.reminder.sendTime === now && lastReminderDate !== today) {
+  if (shouldRunAutomation("reminder", today, db.mailSettings.reminder.sendTime)) {
     const body = buildReminderMail(db);
-    await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body);
-    lastReminderDate = today;
+    const html = buildReminderHtml(db);
+    const result = await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body, html, { date: today, automated: true });
+    markDelivery("reminder", today, result);
   }
 
-  if (db.mailSettings.report.sendTime === now && lastReportDate !== today) {
+  if (shouldRunAutomation("report", today, db.mailSettings.report.sendTime)) {
     const body = buildOrderReportMail(db, today, "all");
-    await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body);
-    lastReportDate = today;
+    const html = buildOrderReportHtml(db, today, "all");
+    const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body, html, { date: today, automated: true });
+    markDelivery("report", today, result);
   }
 }
 
@@ -777,11 +1063,15 @@ async function handleApi(req, res, url) {
     const date = searchParams.get("date") || todayKey();
     const requestedDepartmentId = searchParams.get("departmentId") || "all";
     const departmentId = user.role === "admin" ? requestedDepartmentId : user.departmentId;
+    const report = buildDailyReport(db, date, departmentId);
     sendJson(res, 200, {
       date,
       departmentId,
-      orderItems: orderItems(db, date, departmentId),
-      manualOrderRequests: manualOrderRequests(db, date, departmentId),
+      totals: report.totals,
+      departmentSummaries: report.departmentSummaries,
+      orderItems: report.orderItems,
+      manualOrderRequests: report.manualOrderRequests,
+      notCountedItems: report.notCountedItems,
       mailText: buildOrderReportMail(db, date, departmentId),
     });
     return;
@@ -806,7 +1096,31 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && pathname === "/api/mail-log") {
     const user = requireAuth(req, res, ["admin"]);
     if (!user) return;
-    sendJson(res, 200, readJson(MAIL_LOG_FILE, []));
+    const limit = Number(searchParams.get("limit") || 50);
+    sendJson(res, 200, readJson(MAIL_LOG_FILE, []).slice(-limit).reverse());
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/mail/status") {
+    const user = requireAuth(req, res, ["admin"]);
+    if (!user) return;
+    sendJson(res, 200, {
+      smtp: validateSmtpConfig(),
+      automation: {
+        reminder: {
+          sendTime: db.mailSettings.reminder.sendTime,
+          dueNow: isAutomationDue(db.mailSettings.reminder.sendTime),
+          lastDelivery: lastDelivery("reminder"),
+        },
+        report: {
+          sendTime: db.mailSettings.report.sendTime,
+          dueNow: isAutomationDue(db.mailSettings.report.sendTime),
+          lastDelivery: lastDelivery("report"),
+        },
+      },
+      mailLog: readJson(MAIL_LOG_FILE, []).slice(-10).reverse(),
+      catchUpMinutes: Number(process.env.MAIL_CATCH_UP_MINUTES || 120),
+    });
     return;
   }
 
@@ -814,7 +1128,8 @@ async function handleApi(req, res, url) {
     const user = requireAuth(req, res, ["admin"]);
     if (!user) return;
     const body = buildReminderMail(db);
-    const result = await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body);
+    const html = buildReminderHtml(db);
+    const result = await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body, html, { date: todayKey(), manual: true, username: user.username });
     sendJson(res, 200, result);
     return;
   }
@@ -824,7 +1139,8 @@ async function handleApi(req, res, url) {
     if (!user) return;
     const date = searchParams.get("date") || todayKey();
     const body = buildOrderReportMail(db, date, "all");
-    const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body);
+    const html = buildOrderReportHtml(db, date, "all");
+    const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body, html, { date, manual: true, username: user.username });
     sendJson(res, 200, result);
     return;
   }
@@ -837,9 +1153,13 @@ async function handleApi(req, res, url) {
       sendJson(res, 200, validation);
       return;
     }
-    const transporter = nodemailer.createTransport(smtpTransportOptions());
-    await transporter.verify();
-    sendJson(res, 200, { ok: true, enabled: true, message: "SMTP bağlantısı doğrulandı." });
+    try {
+      const transporter = nodemailer.createTransport(smtpTransportOptions());
+      await transporter.verify();
+      sendJson(res, 200, { ok: true, enabled: true, message: "SMTP bağlantısı doğrulandı." });
+    } catch (error) {
+      sendJson(res, 200, { ok: false, enabled: true, message: `SMTP bağlantısı başarısız: ${error.message}` });
+    }
     return;
   }
 

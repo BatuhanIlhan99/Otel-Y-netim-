@@ -3,6 +3,8 @@
   "port": 8787,
   "dataFile": "../data/app-data.json",
   "mailLogFile": "../data/mail-log.json",
+  "mailStateFile": "../data/mail-state.json",
+  "mailCatchUpMinutes": 120,
   "smtp": {
     "enabled": false,
     "host": "",

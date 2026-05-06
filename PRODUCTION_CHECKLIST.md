@@ -15,6 +15,8 @@
 - Stok yeterli olsa bile manuel sipariş talebi açma yetkisinin kimlerde olacağı netleştirilecek.
 - Mail alıcıları gerçek personel ve yönetici adresleriyle değiştirilecek.
 - Hatırlatma ve rapor saatleri operasyon saatlerine göre ayarlanacak.
+- `Mail Ayarları` ekranında SMTP kontrolü, manuel hatırlatma gönderimi ve manuel yönetici raporu gönderimi test edilecek.
+- `data/mail-log.json` içinde test kayıtlarının oluştuğu, `data/mail-state.json` içinde günlük otomasyon kaydının tutulduğu doğrulanacak.
 
 ## Yedekleme
 

@@ -79,7 +79,7 @@ http://localhost:8787/
 
 Backend açıldığında kullanıcı girişi, ürünler, stok sayımları ve mail ayarları `data/app-data.json` dosyasında tutulur.
 
-Gerçek otomatik mail için `.env` dosyası oluşturup SMTP bilgileri girilmelidir. SMTP kapalıyken otomasyon mail kayıtları `data/mail-log.json` dosyasına yazılır.
+Gerçek otomatik mail için `.env` dosyası oluşturup SMTP bilgileri girilmelidir. SMTP kapalıyken otomasyon mail kayıtları `data/mail-log.json` dosyasına yazılır; günlük otomasyon tekrar kontrolü `data/mail-state.json` dosyasında tutulur.
 
 Örnek SMTP ayarları için `.env.example` dosyasına bak.
 

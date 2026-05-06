@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otel Yonetim GitHub Pages Deploy</title>
+    <style>
+      :root {
+        --bg: #f4f6f5;
+        --surface: #ffffff;
+        --text: #16211f;
+        --muted: #63716d;
+        --line: #d8e2df;
+        --brand: #0f6758;
+        --danger: #b73434;
+        --ok: #23845f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      main {
+        width: min(760px, 100%);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 18px 50px rgba(22, 33, 31, 0.12);
+        overflow: hidden;
+      }
+      header {
+        padding: 24px;
+        background: #16211f;
+        color: #eef3f1;
+      }
+      h1 {
+        margin: 0;
+        font-size: 25px;
+      }
+      header p {
+        margin: 8px 0 0;
+        color: #c6d3cf;
+        line-height: 1.5;
+      }
+      section {
+        padding: 22px;
+        display: grid;
+        gap: 14px;
+      }
+      label {
+        font-weight: 700;
+        font-size: 13px;
+      }
+      input {
+        width: 100%;
+        min-height: 46px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 12px;
+        font: inherit;
+      }
+      button {
+        min-height: 44px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .hint {
+        color: var(--muted);
+        line-height: 1.5;
+        font-size: 14px;
+      }
+      .status {
+        min-height: 140px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfc;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        overflow: auto;
+      }
+      .ok { color: var(--ok); font-weight: 700; }
+      .danger { color: var(--danger); font-weight: 700; }
+      a { color: var(--brand); font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Otel Yonetim Deploy</h1>
+        <p>Bu arac sadece GitHub Pages'i yeniden baslatir. Token tarayicida kullanilir, kaydedilmez.</p>
+      </header>
+      <section>
+        <label for="token">GitHub token</label>
+        <input id="token" type="password" autocomplete="off" placeholder="ghp_ veya github_pat_ ile baslayan token" />
+        <label for="folder">Proje klasörü</label>
+        <input id="folder" type="file" webkitdirectory directory multiple />
+        <button id="deploy">Tum Dosyalari Deploy Et</button>
+        <div class="hint">
+          Gerekli izin: classic token icin <strong>repo</strong>; fine-grained token icin
+          <strong>Otel-Y-netim-</strong> repository ve <strong>Contents: Read and write</strong>.
+          Workflow dosyalari bilerek atlanir; GitHub Pages branch deploy icin gerekli degildir.
+        </div>
+        <div id="status" class="status">Hazir.</div>
+        <a href="https://batuhanilhan99.github.io/Otel-Y-netim-/" target="_blank" rel="noreferrer">Site linkini ac</a>
+      </section>
+    </main>
+
+    <script>
+      const owner = "BatuhanIlhan99";
+      const repo = "Otel-Y-netim-";
+      const branch = "main";
+      const siteUrl = "https://batuhanilhan99.github.io/Otel-Y-netim-/";
+      const tokenInput = document.querySelector("#token");
+      const folderInput = document.querySelector("#folder");
+      const button = document.querySelector("#deploy");
+      const statusBox = document.querySelector("#status");
+
+      const log = (message) => {
+        statusBox.textContent += `\n${message}`;
+        statusBox.scrollTop = statusBox.scrollHeight;
+      };
+
+      const cleanToken = (value) => {
+        const compact = String(value || "").replace(/[\u0000-\u001f\u007f\s]/g, "").trim();
+        const match = compact.match(/(ghp_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)/);
+        return match ? match[0] : compact;
+      };
+
+      const deployablePath = (path) => {
+        const normalized = path.replaceAll("\\", "/");
+        const parts = normalized.split("/").filter(Boolean);
+        const clean = parts.length > 1 ? parts.slice(1).join("/") : normalized;
+        return clean;
+      };
+
+      const shouldSkip = (path) => {
+        if (!path) return true;
+        if (path.startsWith(".git/")) return true;
+        if (path.startsWith("node_modules/")) return true;
+        if (path.startsWith(".github/")) return true;
+        if (path === "PAGES_YENIDEN_BASLAT_LOG.txt") return true;
+        if (path === "github-deploy-sonuc.txt") return true;
+        if (path.startsWith("data/") && path !== "data/.gitkeep") return true;
+        return false;
+      };
+
+      const toBase64 = async (file) => {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+      };
+
+      const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");
+
+      const github = async (method, path, token, body) => {
+        const response = await fetch(`https://api.github.com${path}`, {
+          method,
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28"
+          },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const text = await response.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { message: text };
+        }
+        if (!response.ok) {
+          const detail = data.message || response.statusText;
+          throw new Error(`HTTP ${response.status}: ${detail}`);
+        }
+        return data;
+      };
+
+      const getCurrentSha = async (path, token) => {
+        try {
+          const current = await github("GET", `/repos/${owner}/${repo}/contents/${encodePath(path)}?ref=${branch}`, token);
+          return current.sha || null;
+        } catch (error) {
+          if (String(error.message).includes("HTTP 404")) return null;
+          throw error;
+        }
+      };
+
+      button.addEventListener("click", async () => {
+        statusBox.className = "status";
+        statusBox.textContent = "Deploy basladi...";
+        button.disabled = true;
+
+        try {
+          const token = cleanToken(tokenInput.value);
+          tokenInput.value = "";
+
+          if (!token) {
+            throw new Error("Token bos.");
+          }
+
+          const files = [...folderInput.files]
+            .map((file) => ({ file, path: deployablePath(file.webkitRelativePath || file.name) }))
+            .filter((item) => !shouldSkip(item.path));
+
+          if (files.length === 0) {
+            throw new Error("Proje klasoru secilmedi veya yuklenecek dosya bulunamadi.");
+          }
+
+          log("GitHub repo kontrol ediliyor...");
+          const repoInfo = await github("GET", `/repos/${owner}/${repo}`, token);
+          log(`Repo bulundu: ${repoInfo.full_name}`);
+
+          const forcedNoJekyll = new File([`GitHub Pages rebuild: ${new Date().toISOString()}\n`], ".nojekyll", {
+            type: "text/plain"
+          });
+          if (!files.some((item) => item.path === ".nojekyll")) {
+            files.push({ file: forcedNoJekyll, path: ".nojekyll" });
+          }
+
+          log(`${files.length} dosya yuklenecek.`);
+          let lastCommit = "";
+
+          for (const [index, item] of files.entries()) {
+            log(`[${index + 1}/${files.length}] ${item.path}`);
+            const sha = await getCurrentSha(item.path, token);
+            const body = {
+              message: `Deploy ${item.path}`,
+              content: await toBase64(item.file),
+              branch
+            };
+            if (sha) body.sha = sha;
+            const result = await github("PUT", `/repos/${owner}/${repo}/contents/${encodePath(item.path)}`, token, body);
+            lastCommit = result.commit.sha;
+          }
+
+          log(`Son commit: ${lastCommit}`);
+
+          try {
+            const pages = await github("GET", `/repos/${owner}/${repo}/pages`, token);
+            log(`Pages durumu: ${pages.status || "ok"}`);
+            log(`Pages adresi: ${pages.html_url || siteUrl}`);
+          } catch {
+            log("Pages durumu okunamadi ama commit basarili.");
+          }
+
+          statusBox.className = "status ok";
+          log("Deploy tetiklendi. 1-5 dakika sonra siteyi ac.");
+          window.open(siteUrl, "_blank", "noopener,noreferrer");
+        } catch (error) {
+          statusBox.className = "status danger";
+          log(`HATA: ${error.message}`);
+          log("Token izinlerini tekrar kontrol et: repo veya Contents: Read and write gerekli.");
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

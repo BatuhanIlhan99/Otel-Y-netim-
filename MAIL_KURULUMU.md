@@ -3,7 +3,9 @@
 Otel Yönetim iki farklı mail otomasyonu kullanır:
 
 - Personel hatırlatma maili: personele stok sayımı girmesini hatırlatır.
-- Yönetici sipariş raporu: minimum stok altındaki ürünleri yönetime gönderir.
+- Yönetici sipariş raporu: minimum stok altındaki ürünleri, manuel sipariş taleplerini ve departman sayım durumunu yönetime gönderir.
+
+Backend her gönderimi `data/mail-log.json` içine kaydeder. Günlük otomasyon tekrar eden mail göndermesin diye son gönderim durumunu `data/mail-state.json` içinde tutar.
 
 ## SMTP aktif etme
 
@@ -18,7 +20,10 @@ SMTP_PORT=587
 SMTP_USER=kullanici@domain.com
 SMTP_PASS=sifre
 SMTP_FROM=stok@domain.com
+SMTP_FROM_NAME=Otel Yönetim Stok
 SMTP_SECURE=false
+SMTP_TIMEOUT_MS=15000
+MAIL_CATCH_UP_MINUTES=120
 ```
 
 ## Test
@@ -39,6 +44,23 @@ admin / admin123
 4. Sonra `Hatırlatma gönder` veya `Rapor gönder` butonuyla test et.
 
 SMTP kapalıysa mail gerçek gönderilmez, `data/mail-log.json` dosyasına kaydedilir.
+
+## Otomasyon davranışı
+
+- Hatırlatma ve rapor saatleri `Mail Ayarları` ekranından değiştirilir.
+- Backend açık kaldığı sürece zamanlayıcı dakikada bir kontrol eder.
+- Belirlenen saat kaçırılırsa `MAIL_CATCH_UP_MINUTES` süresi içinde aynı gün yakalama gönderimi yapılır.
+- Aynı gün aynı otomasyon ikinci kez otomatik gönderilmez; manuel gönderim butonları her zaman test için kullanılabilir.
+
+## Yönetici rapor içeriği
+
+Yönetici raporu şu bölümlerle gider:
+
+- Aktif ürün, sayılan ürün, eksik sayım, kritik stok ve manuel sipariş talebi özeti
+- Departman bazlı tamamlanma yüzdesi
+- Minimum stok altındaki ürünler
+- Stok yeterli olsa bile manuel sipariş istenen ürünler
+- Sayımı henüz girilmemiş ilk ürünler
 
 ## Önemli
 
