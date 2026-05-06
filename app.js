@@ -1012,6 +1012,7 @@ const localBackendUrl = "http://127.0.0.1:8787";
 const configuredApiBaseUrl = readConfiguredApiBaseUrl();
 const isGithubPages = location.hostname.endsWith("github.io");
 const isFileMode = location.protocol === "file:";
+const staticFrontendMode = isGithubPages && !configuredApiBaseUrl;
 const backendBaseUrl = configuredApiBaseUrl || (isFileMode ? localBackendUrl : "");
 const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol) && !webApiRequired();
 const backendMode = configuredApiBaseUrl ? "cloud" : isFileMode ? "local" : isGithubPages ? "unconfigured-static" : "same-origin";
@@ -1028,7 +1029,7 @@ function readConfiguredApiBaseUrl() {
 }
 
 function webApiRequired() {
-  return isGithubPages && !configuredApiBaseUrl;
+  return staticFrontendMode;
 }
 
 function backendDisplayUrl() {
@@ -1267,6 +1268,7 @@ function render() {
       </aside>
       <section class="content">
         ${renderTopbar()}
+        ${renderRuntimeBanner()}
         ${renderView()}
       </section>
     </div>
@@ -1305,6 +1307,24 @@ function renderTopbar() {
         year: "numeric",
       })}</div>
     </header>
+  `;
+}
+
+function renderRuntimeBanner() {
+  if (backendEnabled) return "";
+  if (staticFrontendMode) {
+    return `
+      <section class="notice-panel">
+        <strong>Önizleme modu</strong>
+        <span>Siteye giriş yapabilirsin. Ortak stok verisi ve gerçek mail için uygulamayı otel içi backend adresinden aç: ana bilgisayarda <b>OTEL_AGDA_CALISTIR.cmd</b> çalışınca ekranda çıkan <b>http://192.168.x.x:8787/</b> adresi tüm cihazlarda kullanılacak.</span>
+      </section>
+    `;
+  }
+  return `
+    <section class="notice-panel">
+      <strong>Web API bekleniyor</strong>
+      <span>${escapeHtml(backendConnectionMessage())}</span>
+    </section>
   `;
 }
 
@@ -1923,10 +1943,10 @@ function renderMailLogPanel() {
 
 function renderWebApiPanel() {
   const displayUrl = backendDisplayUrl();
-  const badgeClass = backendEnabled ? "ok" : "danger";
-  const badgeText = backendEnabled ? "Web API bağlı" : "Web API gerekli";
+  const badgeClass = backendEnabled ? "ok" : "";
+  const badgeText = backendEnabled ? "Web API bağlı" : "Önizleme modu";
   const note = webApiRequired()
-    ? "GitHub Pages mail gönderemez ve ortak stok verisi tutamaz. Bulut backend URL'i gir veya uygulamayı backend'in yayın adresinden aç."
+    ? "GitHub Pages sadece arayüzdür. Ortak veri ve mail için otel içi backend adresinden gir veya bulut backend URL'i tanımla."
     : backendMode === "same-origin"
       ? "Uygulama backend ile aynı web adresinden çalışıyor; telefon ve bilgisayarlar aynı veriyi kullanır."
       : "Bu adres tüm cihazlarda kullanılacak merkezi API bağlantısıdır.";
@@ -1971,6 +1991,10 @@ function backendConnectionMessage() {
 
 async function handleMailBackendFailure(kind, error) {
   const text = kind === "reminder" ? buildReminderMail() : buildMailReport();
+  if (staticFrontendMode) {
+    window.alert("Mail gönderimi için web backend gerekli. Ana bilgisayarda OTEL_AGDA_CALISTIR.cmd çalıştır, ekranda çıkan http://192.168.x.x:8787/ adresinden giriş yap.");
+    return;
+  }
   try {
     await copyText(text);
     window.alert(`${backendConnectionMessage()}\n\nMail gerçek gönderilmedi; ${kind === "reminder" ? "hatırlatma" : "rapor"} metni panoya kopyalandı.\n\nTeknik detay: ${error.message || "backend bağlantısı yok"}`);
@@ -1980,6 +2004,10 @@ async function handleMailBackendFailure(kind, error) {
 }
 
 function renderMailSettings() {
+  const mailActionDisabled = backendEnabled ? "" : "disabled";
+  const mailActionHint = backendEnabled
+    ? ""
+    : `<span class="hint">Mail gönderimi için backend adresinden giriş yapılmalı.</span>`;
   return `
     <div class="grid mail-settings-layout">
       ${renderWebApiPanel()}
@@ -2035,8 +2063,9 @@ function renderMailSettings() {
           </div>
           <div class="toolbar">
             <button class="btn" type="submit">Mail otomasyonlarını kaydet</button>
-            <button class="btn secondary" type="button" data-action="verify-smtp">SMTP kontrol et</button>
+            <button class="btn secondary" type="button" data-action="verify-smtp" ${mailActionDisabled}>SMTP kontrol et</button>
           </div>
+          ${mailActionHint}
         </form>
       </section>
       <section class="panel">
@@ -2044,9 +2073,10 @@ function renderMailSettings() {
           <h3 class="panel-title">Hatırlatma maili ön izlemesi</h3>
           <div class="toolbar">
             <span class="badge">Personel</span>
-            <button class="btn secondary" data-action="send-reminder-mail">Hatırlatma gönder</button>
+            <button class="btn secondary" data-action="send-reminder-mail" ${mailActionDisabled}>Hatırlatma gönder</button>
           </div>
         </div>
+        ${mailActionHint}
         <div class="mail-preview">${escapeHtml(buildReminderMail())}</div>
       </section>
       <section class="panel">
@@ -2054,9 +2084,10 @@ function renderMailSettings() {
           <h3 class="panel-title">Yönetici raporu ön izlemesi</h3>
           <div class="toolbar">
             <span class="badge">Sipariş gerekli</span>
-            <button class="btn secondary" data-action="send-report-mail">Rapor gönder</button>
+            <button class="btn secondary" data-action="send-report-mail" ${mailActionDisabled}>Rapor gönder</button>
           </div>
         </div>
+        ${mailActionHint}
         <div class="mail-preview">${escapeHtml(buildMailReport())}</div>
       </section>
       ${renderMailLogPanel()}
@@ -2104,7 +2135,7 @@ function renderLogin() {
             <p class="eyebrow">Giriş</p>
             <h2>Kullanıcı hesabı</h2>
           </div>
-          ${webApiRequired() ? `<div class="error">Bu yayın adresine henüz bulut backend bağlanmadı. Ortak stok ve mail gönderimi için uygulamayı backend web adresinden aç veya aşağıya bulut API adresini gir.</div>` : ""}
+          ${webApiRequired() ? `<div class="notice-box"><strong>Önizleme modu açık.</strong> Bu adresten siteye girebilirsin. Ortak stok, 10 cihazdan kullanım ve gerçek mail için ana bilgisayarda <b>OTEL_AGDA_CALISTIR.cmd</b> çalıştırıp ekranda çıkan <b>http://192.168.x.x:8787/</b> adresinden giriş yapılmalı. Bulut backend kullanacaksan aşağıya API adresini girebilirsin.</div>` : ""}
           ${webApiRequired() ? `
             <div class="form-row">
               <label for="apiBaseUrl">Bulut backend adresi</label>
@@ -2377,10 +2408,6 @@ app.addEventListener("submit", async (event) => {
     if (loginApiBaseUrl && loginApiBaseUrl !== configuredApiBaseUrl) {
       localStorage.setItem("otel-api-base-url", loginApiBaseUrl);
       window.location.reload();
-      return;
-    }
-    if (webApiRequired()) {
-      event.target.querySelector("[data-error]").textContent = "Bu adres sadece statik arayüz. Telefon ve bilgisayarlarda ortak kullanım için bulut backend adresi gerekli.";
       return;
     }
     let user = users.find((item) => item.username === username && item.password === password);
