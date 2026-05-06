@@ -1009,8 +1009,34 @@ function todayKey() {
 
 const app = document.querySelector("#app");
 const localBackendUrl = "http://127.0.0.1:8787";
-const backendBaseUrl = location.protocol === "file:" ? localBackendUrl : "";
-const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol);
+const configuredApiBaseUrl = readConfiguredApiBaseUrl();
+const isGithubPages = location.hostname.endsWith("github.io");
+const isFileMode = location.protocol === "file:";
+const backendBaseUrl = configuredApiBaseUrl || (isFileMode ? localBackendUrl : "");
+const backendEnabled = ["http:", "https:", "file:"].includes(location.protocol) && !webApiRequired();
+const backendMode = configuredApiBaseUrl ? "cloud" : isFileMode ? "local" : isGithubPages ? "unconfigured-static" : "same-origin";
+
+function cleanApiBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function readConfiguredApiBaseUrl() {
+  const queryValue = new URLSearchParams(location.search).get("api");
+  const savedValue = localStorage.getItem("otel-api-base-url");
+  const configValue = window.OTEL_CONFIG?.apiBaseUrl;
+  return cleanApiBaseUrl(queryValue || savedValue || configValue || "");
+}
+
+function webApiRequired() {
+  return isGithubPages && !configuredApiBaseUrl;
+}
+
+function backendDisplayUrl() {
+  if (configuredApiBaseUrl) return configuredApiBaseUrl;
+  if (isFileMode) return localBackendUrl;
+  if (backendMode === "same-origin") return location.origin;
+  return "";
+}
 
 async function apiRequest(path, options = {}) {
   if (!backendEnabled) return null;
@@ -1067,7 +1093,7 @@ async function refreshMailStatus(renderAfter = false) {
     return state.mailStatus;
   } catch (error) {
     state.mailStatus = {
-      smtp: { ok: false, enabled: false, message: `Backend mail durumu okunamadı. ${localBackendUrl} adresinde backend açık olmalı.` },
+      smtp: { ok: false, enabled: false, message: backendConnectionMessage() },
       automation: {},
       mailLog: [],
     };
@@ -1895,8 +1921,52 @@ function renderMailLogPanel() {
   `;
 }
 
+function renderWebApiPanel() {
+  const displayUrl = backendDisplayUrl();
+  const badgeClass = backendEnabled ? "ok" : "danger";
+  const badgeText = backendEnabled ? "Web API bağlı" : "Web API gerekli";
+  const note = webApiRequired()
+    ? "GitHub Pages mail gönderemez ve ortak stok verisi tutamaz. Bulut backend URL'i gir veya uygulamayı backend'in yayın adresinden aç."
+    : backendMode === "same-origin"
+      ? "Uygulama backend ile aynı web adresinden çalışıyor; telefon ve bilgisayarlar aynı veriyi kullanır."
+      : "Bu adres tüm cihazlarda kullanılacak merkezi API bağlantısıdır.";
+
+  return `
+    <section class="panel web-api-panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Web API bağlantısı</h3>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <form class="form-body" data-action="api-settings">
+        <div class="form-row">
+          <label>Bulut backend adresi</label>
+          <input name="apiBaseUrl" placeholder="https://otel-yonetim.onrender.com" value="${escapeHtml(configuredApiBaseUrl)}" />
+          <span class="hint">${escapeHtml(note)}</span>
+        </div>
+        <div class="toolbar">
+          <button class="btn" type="submit">API adresini kaydet</button>
+          <button class="btn secondary" type="button" data-action="refresh-mail-status">Bağlantıyı kontrol et</button>
+        </div>
+      </form>
+      <div class="meta-list">
+        <div><strong>Aktif mod</strong><span>${escapeHtml(backendMode)}</span></div>
+        <div><strong>API</strong><span>${escapeHtml(displayUrl || "Tanımlı değil")}</span></div>
+      </div>
+    </section>
+  `;
+}
+
 function backendConnectionMessage() {
-  return `Backend bağlantısı yok. Önce START_BACKEND.cmd dosyasını çalıştır veya siteyi ${localBackendUrl}/ adresinden aç.`;
+  if (webApiRequired()) {
+    return "Bu GitHub Pages adresi sadece arayüzü yayınlıyor. Stok kayıtları ve mail gönderimi için bulut backend adresi config.js içinde tanımlanmalı ya da uygulama backend'in kendi web adresinden açılmalı.";
+  }
+  if (backendMode === "cloud") {
+    return `Bulut API bağlantısı kurulamadı: ${backendDisplayUrl()}`;
+  }
+  if (isFileMode) {
+    return `Yerel dosyadan açılan ekranda gerçek mail için backend açık olmalı: ${localBackendUrl}/`;
+  }
+  return `Web API bağlantısı kurulamadı: ${backendDisplayUrl() || location.origin}`;
 }
 
 async function handleMailBackendFailure(kind, error) {
@@ -1912,6 +1982,7 @@ async function handleMailBackendFailure(kind, error) {
 function renderMailSettings() {
   return `
     <div class="grid mail-settings-layout">
+      ${renderWebApiPanel()}
       ${renderMailStatusPanel()}
       <section class="panel">
         <div class="panel-head">
@@ -2033,6 +2104,13 @@ function renderLogin() {
             <p class="eyebrow">Giriş</p>
             <h2>Kullanıcı hesabı</h2>
           </div>
+          ${webApiRequired() ? `<div class="error">Bu yayın adresine henüz bulut backend bağlanmadı. Ortak stok ve mail gönderimi için uygulamayı backend web adresinden aç veya aşağıya bulut API adresini gir.</div>` : ""}
+          ${webApiRequired() ? `
+            <div class="form-row">
+              <label for="apiBaseUrl">Bulut backend adresi</label>
+              <input id="apiBaseUrl" name="apiBaseUrl" placeholder="https://otel-yonetim.onrender.com" />
+            </div>
+          ` : ""}
           <div class="form-row">
             <label for="username">Kullanıcı adı</label>
             <input id="username" name="username" autocomplete="username" value="admin" />
@@ -2295,6 +2373,16 @@ app.addEventListener("submit", async (event) => {
     const formData = new FormData(event.target);
     const username = String(formData.get("username") || "").trim();
     const password = String(formData.get("password") || "");
+    const loginApiBaseUrl = cleanApiBaseUrl(formData.get("apiBaseUrl"));
+    if (loginApiBaseUrl && loginApiBaseUrl !== configuredApiBaseUrl) {
+      localStorage.setItem("otel-api-base-url", loginApiBaseUrl);
+      window.location.reload();
+      return;
+    }
+    if (webApiRequired()) {
+      event.target.querySelector("[data-error]").textContent = "Bu adres sadece statik arayüz. Telefon ve bilgisayarlarda ortak kullanım için bulut backend adresi gerekli.";
+      return;
+    }
     let user = users.find((item) => item.username === username && item.password === password);
 
     if (backendEnabled) {
@@ -2330,6 +2418,18 @@ app.addEventListener("submit", async (event) => {
   if (action === "product-form") {
     upsertProduct(event.target);
     render();
+  }
+
+  if (action === "api-settings") {
+    const formData = new FormData(event.target);
+    const apiBaseUrl = cleanApiBaseUrl(formData.get("apiBaseUrl"));
+    if (apiBaseUrl) {
+      localStorage.setItem("otel-api-base-url", apiBaseUrl);
+    } else {
+      localStorage.removeItem("otel-api-base-url");
+    }
+    window.alert("Web API adresi kaydedildi. Sayfa yeniden yüklenecek.");
+    window.location.reload();
   }
 
   if (action === "mail-settings") {

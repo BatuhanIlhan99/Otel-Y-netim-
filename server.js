@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, "data");
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data"));
 const DATA_FILE = path.join(DATA_DIR, "app-data.json");
 const MAIL_LOG_FILE = path.join(DATA_DIR, "mail-log.json");
 const MAIL_STATE_FILE = path.join(DATA_DIR, "mail-state.json");
@@ -17,7 +17,7 @@ const MAIL_LOG_LIMIT = 500;
 loadEnvFile(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 8787);
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST = process.env.HOST || (process.env.RENDER || process.env.RAILWAY_ENVIRONMENT ? "0.0.0.0" : "127.0.0.1");
 const sessions = new Map();
 
 const MIME_TYPES = {
@@ -884,8 +884,8 @@ function serveStatic(req, res, pathname) {
     return;
   }
   const relativePath = path.relative(ROOT, filePath);
-  const blockedStaticRoots = ["data", ".git", ".github"];
-  const blockedStaticFiles = new Set([".env", ".env.example", "package-lock.json"]);
+  const blockedStaticRoots = ["data", ".git", ".github", ".deploy-secrets", ".deploy-work", "backend"];
+  const blockedStaticFiles = new Set([".env", ".env.example", "package-lock.json", "server.js", "package.json", "render.yaml"]);
   if (
     blockedStaticRoots.includes(relativePath.split(path.sep)[0]) ||
     blockedStaticFiles.has(path.basename(filePath))

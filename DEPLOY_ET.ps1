@@ -101,6 +101,7 @@ function Sync-ProjectFiles {
     ".nojekyll",
     "404.html",
     "app.js",
+    "config.js",
     "deploy-hotfix.js",
     "DEPLOY_ET.cmd",
     "DEPLOY_ET.ps1",
@@ -127,12 +128,14 @@ function Sync-ProjectFiles {
     "package.json",
     "PRODUCTION_CHECKLIST.md",
     "README.md",
+    "render.yaml",
     "RETRY_PAGES_FIX_PUSH.ps1",
     "server.js",
     "START_BACKEND.cmd",
     "START_BACKEND.ps1",
     "START_NODE_BACKEND.cmd",
     "styles.css",
+    "WEB_TABANLI_KURULUM.md",
     "YOL_HARITASI.md"
   )
 
