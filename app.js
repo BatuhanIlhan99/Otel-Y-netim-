@@ -1771,6 +1771,7 @@ function renderCounting() {
           ${renderDepartmentFilter()}
           <input class="search" value="${escapeHtml(state.search)}" placeholder="Ürün ara" data-action="search" />
           <button class="btn" data-action="save-counts">Kaydet</button>
+          <button class="btn secondary" data-view="rapor">Raporu gonder</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -1798,6 +1799,7 @@ function renderCounting() {
 function renderReport() {
   return `
     ${renderStats(state.reportDate)}
+    ${renderReportActionPanel()}
     <div class="grid two-col">
       <section class="panel">
         <div class="panel-head">
@@ -1832,6 +1834,88 @@ function renderReport() {
         <div class="mail-preview">${escapeHtml(buildMailReport())}</div>
       </section>
     </div>
+    ${renderDetailedReportTable(state.reportDate)}
+  `;
+}
+
+function reportDepartmentId() {
+  return state.user?.role === "admin" ? state.selectedDepartment : state.user?.departmentId || state.selectedDepartment;
+}
+
+function reportScopeLabel() {
+  return departmentName(reportDepartmentId());
+}
+
+function renderReportActionPanel() {
+  const shareSupport = navigator.share ? "Mobil cihazlarda WhatsApp, Mail ve diger uygulamalara dosya paylasimi acilir." : "Bu cihazda dosya paylasimi desteklenmezse dosya indirilir.";
+  return `
+    <section class="panel report-center-panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Departman rapor gonderim merkezi</h3>
+        <span class="badge ok">${escapeHtml(reportScopeLabel())}</span>
+      </div>
+      <div class="report-action-grid">
+        <button class="btn" data-action="download-pdf-report">PDF indir</button>
+        <button class="btn secondary" data-action="print-pdf-report">PDF yazdir</button>
+        <button class="btn" data-action="download-excel-report">Excel indir</button>
+        <button class="btn secondary" data-action="share-pdf-report">WhatsApp PDF</button>
+        <button class="btn secondary" data-action="share-excel-report">WhatsApp Excel</button>
+        <button class="btn secondary" data-action="share-whatsapp-report">WhatsApp ozeti</button>
+        <button class="btn secondary" data-action="email-report">Mail olarak hazirla</button>
+        <button class="btn secondary" data-action="copy-report">Rapor metnini kopyala</button>
+      </div>
+      <div class="report-action-note">
+        <strong>${escapeHtml(state.reportDate)}</strong>
+        <span>${escapeHtml(shareSupport)} PDF butonu yazdirma ekranini acar; bilgisayarda "PDF olarak kaydet", telefonda paylas/yazdir secenegi kullanilir.</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderDetailedReportTable(date = state.reportDate) {
+  const rows = reportProductRows(date)
+    .map((row) => `
+      <tr>
+        <td data-label="Departman">${escapeHtml(row.department)}</td>
+        <td data-label="Urun"><strong>${escapeHtml(row.product)}</strong></td>
+        <td data-label="Birim">${escapeHtml(row.unit)}</td>
+        <td data-label="Onceki">${escapeHtml(row.previous)}</td>
+        <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
+        <td data-label="Sayim">${escapeHtml(row.counted || "Girilmedi")}</td>
+        <td data-label="Durum"><span class="badge ${row.status === "Kritik" || row.status === "Bekliyor" ? "danger" : "ok"}">${escapeHtml(row.status)}</span></td>
+        <td data-label="Siparis">${escapeHtml(row.manualOrder)}</td>
+        <td data-label="Talep">${escapeHtml(row.requestQty)}</td>
+        <td data-label="Not">${escapeHtml(row.note || row.requestReason)}</td>
+      </tr>
+    `)
+    .join("");
+
+  return `
+    <section class="panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Rapor detay tablosu</h3>
+        <span class="badge">${escapeHtml(reportScopeLabel())}</span>
+      </div>
+      <div class="table-wrap report-detail-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Departman</th>
+              <th>Urun</th>
+              <th>Birim</th>
+              <th>Onceki</th>
+              <th>Minimum</th>
+              <th>Sayim</th>
+              <th>Durum</th>
+              <th>Siparis</th>
+              <th>Talep</th>
+              <th>Not</th>
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="10" class="empty">Bu rapor filtresinde urun yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
   `;
 }
 
@@ -1977,6 +2061,437 @@ function buildReminderMail() {
   });
 
   return lines.join("\n");
+}
+
+function formatReportNumber(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return String(value);
+  return Number.isInteger(numeric) ? String(numeric) : numeric.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+}
+
+function reportFileStem(extension = "") {
+  const scope = reportScopeLabel()
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "") || "rapor";
+  return `stok-raporu-${state.reportDate}-${scope}${extension}`;
+}
+
+function reportProductRows(date = state.reportDate, departmentId = reportDepartmentId()) {
+  const snapshot = buildDailyReportSnapshot(date, departmentId);
+  return snapshot.productStates.map(({ product, count, qty }) => {
+    const counted = count ? Number(count.qty) : "";
+    const status = count ? (Number(count.qty) <= Number(product.minQty) ? "Kritik" : "Yeterli") : "Bekliyor";
+    const orderRequest = count?.orderRequest || {};
+    return {
+      date,
+      department: departmentName(product.departmentId),
+      product: product.name,
+      unit: product.unit,
+      previous: formatReportNumber(product.lastQty),
+      minimum: formatReportNumber(product.minQty),
+      counted: formatReportNumber(counted),
+      status,
+      savedBy: count?.user || "",
+      savedAt: count?.time || "",
+      note: count?.note || "",
+      manualOrder: orderRequest.requested ? "Evet" : "Hayir",
+      requestQty: orderRequest.requested && orderRequest.qty ? `${formatReportNumber(orderRequest.qty)} ${product.unit}` : "",
+      requestReason: orderRequest.reason || "",
+      effectiveQty: formatReportNumber(qty),
+    };
+  });
+}
+
+function reportSummaryText() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const counted = snapshot.productStates.length - snapshot.notCounted.length;
+  const lines = [
+    `Otel Yonetim stok raporu`,
+    `Tarih: ${state.reportDate}`,
+    `Kapsam: ${reportScopeLabel()}`,
+    `Aktif urun: ${snapshot.productStates.length}`,
+    `Sayilan urun: ${counted}`,
+    `Eksik sayim: ${snapshot.notCounted.length}`,
+    `Kritik stok: ${snapshot.criticalItems.length}`,
+    `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
+  ];
+
+  if (snapshot.criticalItems.length) {
+    lines.push("", "Siparis gereken ilk urunler:");
+    snapshot.criticalItems.slice(0, 12).forEach(({ product, qty }) => {
+      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${formatReportNumber(qty)} ${product.unit} | min ${formatReportNumber(product.minQty)}`);
+    });
+  }
+
+  if (snapshot.manualRequests.length) {
+    lines.push("", "Manuel siparis talepleri:");
+    snapshot.manualRequests.slice(0, 12).forEach(({ product, count }) => {
+      const request = count.orderRequest || {};
+      const qty = request.qty ? `${formatReportNumber(request.qty)} ${product.unit}` : "miktar belirtilmedi";
+      const reason = request.reason ? ` | ${request.reason}` : "";
+      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${qty}${reason}`);
+    });
+  }
+
+  return lines.join("\n");
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function excelCell(value) {
+  return escapeHtml(value).replace(/\n/g, "<br>");
+}
+
+function buildExcelHtml() {
+  const rows = reportProductRows();
+  const headers = ["Tarih", "Departman", "Urun", "Birim", "Onceki", "Minimum", "Sayim", "Durum", "Kaydeden", "Saat", "Not", "Manuel Siparis", "Talep Miktari", "Talep Gerekcesi"];
+  const bodyRows = rows.map((row) => `
+    <tr>
+      <td>${excelCell(row.date)}</td>
+      <td>${excelCell(row.department)}</td>
+      <td>${excelCell(row.product)}</td>
+      <td>${excelCell(row.unit)}</td>
+      <td>${excelCell(row.previous)}</td>
+      <td>${excelCell(row.minimum)}</td>
+      <td>${excelCell(row.counted)}</td>
+      <td>${excelCell(row.status)}</td>
+      <td>${excelCell(row.savedBy)}</td>
+      <td>${excelCell(row.savedAt)}</td>
+      <td>${excelCell(row.note)}</td>
+      <td>${excelCell(row.manualOrder)}</td>
+      <td>${excelCell(row.requestQty)}</td>
+      <td>${excelCell(row.requestReason)}</td>
+    </tr>
+  `).join("");
+
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        table { border-collapse: collapse; font-family: Arial, sans-serif; }
+        th, td { border: 1px solid #cfd8d5; padding: 7px 9px; vertical-align: top; }
+        th { background: #eef4f2; color: #0f6758; }
+      </style>
+    </head>
+    <body>
+      <h2>Otel Yonetim Stok Raporu</h2>
+      <p>Tarih: ${excelCell(state.reportDate)} | Kapsam: ${excelCell(reportScopeLabel())}</p>
+      <table>
+        <thead><tr>${headers.map((header) => `<th>${excelCell(header)}</th>`).join("")}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </body>
+  </html>`;
+}
+
+function createExcelFile() {
+  const blob = new Blob([`\ufeff${buildExcelHtml()}`], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const name = reportFileStem(".xls");
+  try {
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    blob.name = name;
+    return blob;
+  }
+}
+
+function downloadExcelReport() {
+  const file = createExcelFile();
+  downloadBlob(file, file.name || reportFileStem(".xls"));
+}
+
+async function shareExcelReport() {
+  const file = createExcelFile();
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    await navigator.share({
+      title: "Otel Yonetim stok raporu",
+      text: reportSummaryText(),
+      files: [file],
+    });
+    return;
+  }
+
+  downloadBlob(file, file.name || reportFileStem(".xls"));
+  openWhatsAppReport();
+  window.alert("Bu cihaz dosya paylasimini dogrudan desteklemedi. Excel dosyasi indirildi; acilan WhatsApp mesajina dosyayi ekleyebilirsin.");
+}
+
+function toPdfText(value) {
+  const replacements = {
+    "ç": "c", "Ç": "C",
+    "ğ": "g", "Ğ": "G",
+    "ı": "i", "İ": "I",
+    "ö": "o", "Ö": "O",
+    "ş": "s", "Ş": "S",
+    "ü": "u", "Ü": "U",
+  };
+  return String(value || "")
+    .replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => replacements[char] || char)
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "")
+    .slice(0, 150);
+}
+
+function pdfEscape(value) {
+  return toPdfText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function buildPdfLines() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const lines = [
+    "OTEL YONETIM STOK RAPORU",
+    `Tarih: ${state.reportDate}`,
+    `Kapsam: ${reportScopeLabel()}`,
+    `Olusturan: ${state.user?.name || ""}`,
+    "",
+    `Aktif urun: ${snapshot.productStates.length}`,
+    `Sayilan urun: ${snapshot.productStates.length - snapshot.notCounted.length}`,
+    `Eksik sayim: ${snapshot.notCounted.length}`,
+    `Kritik stok: ${snapshot.criticalItems.length}`,
+    `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
+    "",
+    "DEPARTMAN OZETI",
+  ];
+
+  snapshot.departmentSummaries.forEach((item) => {
+    lines.push(`${departmentStockTitle(item.department)} | ${item.counted}/${item.products} | %${item.completion} | Kritik ${item.critical} | Manuel ${item.manual}`);
+  });
+
+  lines.push("", "DETAYLI STOK LISTESI");
+  reportProductRows().forEach((row) => {
+    const request = row.manualOrder === "Evet" ? ` | Talep: ${row.requestQty || "var"} ${row.requestReason}` : "";
+    const note = row.note ? ` | Not: ${row.note}` : "";
+    lines.push(`${row.department} / ${row.product}: ${row.counted || "Girilmedi"} ${row.unit} | Min ${row.minimum} | ${row.status}${request}${note}`);
+  });
+
+  return lines.map(toPdfText);
+}
+
+function buildPdfBlob() {
+  const pageWidth = 842;
+  const pageHeight = 595;
+  const marginX = 36;
+  const startY = 552;
+  const lineHeight = 13;
+  const linesPerPage = 39;
+  const lines = buildPdfLines();
+  const pages = [];
+
+  for (let index = 0; index < lines.length; index += linesPerPage) {
+    pages.push(lines.slice(index, index + linesPerPage));
+  }
+
+  const objects = [];
+  const addObject = (body) => {
+    objects.push(body);
+    return objects.length;
+  };
+
+  addObject("<< /Type /Catalog /Pages 2 0 R >>");
+  addObject("__PAGES__");
+  addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  const pageIds = [];
+  pages.forEach((pageLines, pageIndex) => {
+    const stream = [
+      "BT",
+      `/F1 ${pageIndex === 0 ? 12 : 10} Tf`,
+      `${marginX} ${startY} Td`,
+      `${lineHeight} TL`,
+      ...pageLines.map((line) => `(${pdfEscape(line)}) Tj T*`),
+      "ET",
+    ].join("\n");
+    const contentId = objects.length + 2;
+    const pageId = addObject(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);
+    addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    pageIds.push(pageId);
+  });
+
+  objects[1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((body, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function createPdfFile() {
+  const blob = buildPdfBlob();
+  const name = reportFileStem(".pdf");
+  try {
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    blob.name = name;
+    return blob;
+  }
+}
+
+function downloadPdfReport() {
+  const file = createPdfFile();
+  downloadBlob(file, file.name || reportFileStem(".pdf"));
+}
+
+async function sharePdfReport() {
+  const file = createPdfFile();
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    await navigator.share({
+      title: "Otel Yonetim stok raporu",
+      text: reportSummaryText(),
+      files: [file],
+    });
+    return;
+  }
+
+  downloadBlob(file, file.name || reportFileStem(".pdf"));
+  openWhatsAppReport();
+  window.alert("Bu cihaz PDF dosyasini dogrudan paylasamadigi icin PDF indirildi. Acilan WhatsApp mesajina PDF dosyasini ekleyebilirsin.");
+}
+
+function buildPrintableReportHtml() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const rows = reportProductRows();
+  const detailRows = rows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.department)}</td>
+      <td><strong>${escapeHtml(row.product)}</strong></td>
+      <td>${escapeHtml(row.unit)}</td>
+      <td>${escapeHtml(row.previous)}</td>
+      <td>${escapeHtml(row.minimum)}</td>
+      <td>${escapeHtml(row.counted || "Girilmedi")}</td>
+      <td>${escapeHtml(row.status)}</td>
+      <td>${escapeHtml(row.manualOrder)}</td>
+      <td>${escapeHtml(row.requestQty)}</td>
+      <td>${escapeHtml(row.note || row.requestReason)}</td>
+    </tr>
+  `).join("");
+  const departmentRows = snapshot.departmentSummaries.map((item) => `
+    <tr>
+      <td>${escapeHtml(departmentStockTitle(item.department))}</td>
+      <td>${item.counted}/${item.products}</td>
+      <td>%${item.completion}</td>
+      <td>${item.critical}</td>
+      <td>${item.manual}</td>
+      <td>${item.missing}</td>
+    </tr>
+  `).join("");
+
+  return `<!doctype html>
+  <html lang="tr">
+    <head>
+      <meta charset="utf-8">
+      <title>Stok Raporu ${escapeHtml(state.reportDate)}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 28px; color: #16211f; font-family: Arial, Helvetica, sans-serif; }
+        header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #0f6758; padding-bottom: 16px; margin-bottom: 18px; }
+        h1, h2 { margin: 0; }
+        h1 { font-size: 24px; }
+        h2 { font-size: 16px; margin: 24px 0 10px; color: #0f6758; }
+        .meta { color: #60716d; line-height: 1.5; text-align: right; }
+        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 16px 0; }
+        .stat { border: 1px solid #d7e1de; border-radius: 8px; padding: 10px; }
+        .stat strong { display: block; font-size: 20px; }
+        .stat span { color: #60716d; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        th, td { border: 1px solid #d7e1de; padding: 7px 8px; text-align: left; vertical-align: top; font-size: 12px; }
+        th { background: #eef4f2; color: #0f6758; text-transform: uppercase; font-size: 11px; }
+        @page { size: A4 landscape; margin: 12mm; }
+        @media print { body { padding: 0; } .no-print { display: none; } }
+      </style>
+    </head>
+    <body>
+      <button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:10px 14px;border:0;border-radius:8px;background:#0f6758;color:white;font-weight:700">PDF / Yazdir</button>
+      <header>
+        <div>
+          <h1>Otel Yonetim Stok Raporu</h1>
+          <p>Kritik stok, manuel siparis talepleri ve departman sayim durumu</p>
+        </div>
+        <div class="meta">
+          <strong>Tarih:</strong> ${escapeHtml(state.reportDate)}<br>
+          <strong>Kapsam:</strong> ${escapeHtml(reportScopeLabel())}<br>
+          <strong>Olusturan:</strong> ${escapeHtml(state.user?.name || "")}
+        </div>
+      </header>
+      <section class="stats">
+        <div class="stat"><strong>${snapshot.productStates.length}</strong><span>Aktif urun</span></div>
+        <div class="stat"><strong>${snapshot.productStates.length - snapshot.notCounted.length}</strong><span>Sayilan</span></div>
+        <div class="stat"><strong>${snapshot.notCounted.length}</strong><span>Eksik</span></div>
+        <div class="stat"><strong>${snapshot.criticalItems.length}</strong><span>Kritik</span></div>
+        <div class="stat"><strong>${snapshot.manualRequests.length}</strong><span>Manuel talep</span></div>
+      </section>
+      <h2>Departman ozeti</h2>
+      <table>
+        <thead><tr><th>Departman</th><th>Sayim</th><th>Tamamlanma</th><th>Kritik</th><th>Manuel talep</th><th>Eksik</th></tr></thead>
+        <tbody>${departmentRows}</tbody>
+      </table>
+      <h2>Detayli stok raporu</h2>
+      <table>
+        <thead><tr><th>Departman</th><th>Urun</th><th>Birim</th><th>Onceki</th><th>Minimum</th><th>Sayim</th><th>Durum</th><th>Siparis</th><th>Talep</th><th>Not</th></tr></thead>
+        <tbody>${detailRows}</tbody>
+      </table>
+    </body>
+  </html>`;
+}
+
+function openPrintableReport() {
+  const reportWindow = window.open("", "_blank");
+  if (!reportWindow) {
+    window.alert("Tarayici yeni pencereyi engelledi. Pop-up izni verip tekrar dene.");
+    return;
+  }
+  reportWindow.document.open();
+  reportWindow.document.write(buildPrintableReportHtml());
+  reportWindow.document.close();
+  reportWindow.focus();
+  setTimeout(() => reportWindow.print(), 450);
+}
+
+function openWhatsAppReport() {
+  const text = encodeURIComponent(reportSummaryText());
+  window.open(`https://wa.me/?text=${text}`, "_blank", "noopener");
+}
+
+async function openEmailReport() {
+  if (backendEnabled) {
+    try {
+      const result = await apiRequest(`/api/mail/send-report?date=${encodeURIComponent(state.reportDate)}&departmentId=${encodeURIComponent(reportDepartmentId())}`, { method: "POST" });
+      if (result) {
+        window.alert(result.message || "Rapor maili islendi.");
+        return;
+      }
+    } catch (error) {
+      console.warn("Backend mail gonderimi basarisiz, mail uygulamasi aciliyor.", error);
+    }
+  }
+
+  const subject = encodeURIComponent(`${state.mailSettings.report.subject} - ${state.reportDate} - ${reportScopeLabel()}`);
+  const body = encodeURIComponent(buildMailReport());
+  const recipients = String(state.mailSettings.report.recipients || "").replace(/\s+/g, "");
+  window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`;
 }
 
 function renderProductsAdmin() {
@@ -2583,6 +3098,44 @@ app.addEventListener("click", async (event) => {
     exportCsv();
   }
 
+  if (action === "print-pdf-report") {
+    openPrintableReport();
+  }
+
+  if (action === "download-pdf-report") {
+    downloadPdfReport();
+  }
+
+  if (action === "share-pdf-report") {
+    try {
+      await sharePdfReport();
+    } catch (error) {
+      console.warn("PDF paylasimi basarisiz.", error);
+      downloadPdfReport();
+    }
+  }
+
+  if (action === "download-excel-report") {
+    downloadExcelReport();
+  }
+
+  if (action === "share-excel-report") {
+    try {
+      await shareExcelReport();
+    } catch (error) {
+      console.warn("Excel paylasimi basarisiz.", error);
+      downloadExcelReport();
+    }
+  }
+
+  if (action === "share-whatsapp-report") {
+    openWhatsAppReport();
+  }
+
+  if (action === "email-report") {
+    await openEmailReport();
+  }
+
   if (action === "send-reminder-mail") {
     try {
       const result = await apiRequest("/api/mail/send-reminder", { method: "POST" });
@@ -2597,7 +3150,7 @@ app.addEventListener("click", async (event) => {
 
   if (action === "send-report-mail") {
     try {
-      const result = await apiRequest(`/api/mail/send-report?date=${encodeURIComponent(state.reportDate)}`, { method: "POST" });
+      const result = await apiRequest(`/api/mail/send-report?date=${encodeURIComponent(state.reportDate)}&departmentId=${encodeURIComponent(reportDepartmentId())}`, { method: "POST" });
       if (!result) throw new Error("Backend kapalı.");
       await refreshMailStatus(false);
       window.alert(result?.message || "Yönetici raporu işlendi.");

@@ -1205,12 +1205,14 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && pathname === "/api/mail/send-report") {
-    const user = requireAuth(req, res, ["admin"]);
+    const user = requireAuth(req, res);
     if (!user) return;
     const date = searchParams.get("date") || todayKey();
-    const body = buildOrderReportMail(db, date, "all");
-    const html = buildOrderReportHtml(db, date, "all");
-    const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body, html, { date, manual: true, username: user.username });
+    const requestedDepartmentId = searchParams.get("departmentId") || "all";
+    const departmentId = user.role === "admin" ? requestedDepartmentId : user.departmentId;
+    const body = buildOrderReportMail(db, date, departmentId);
+    const html = buildOrderReportHtml(db, date, departmentId);
+    const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body, html, { date, departmentId, manual: true, username: user.username });
     sendJson(res, 200, result);
     return;
   }

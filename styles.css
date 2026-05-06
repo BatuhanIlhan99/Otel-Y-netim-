@@ -680,6 +680,39 @@ tbody tr:hover {
   color: #2d3935;
 }
 
+.report-center-panel {
+  overflow: visible;
+}
+
+.report-action-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.report-action-grid .btn {
+  width: 100%;
+  min-height: 44px;
+}
+
+.report-action-note {
+  border-top: 1px solid var(--line);
+  padding: 12px 16px 16px;
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.report-action-note strong {
+  color: var(--brand-strong);
+}
+
+.report-detail-wrap table {
+  min-width: 980px;
+}
+
 .settings-list {
   padding: 16px;
   display: grid;
@@ -762,12 +795,17 @@ tbody tr:hover {
   .two-col,
   .mail-settings-layout,
   .mail-status-grid,
+  .report-action-grid,
   .executive-layout,
   .admin-products-layout,
   .form-grid,
   .quick-product-grid,
   .login-card {
     grid-template-columns: 1fr;
+  }
+
+  .report-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .login-intro {
@@ -919,6 +957,10 @@ tbody tr:hover {
   }
 
   .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .report-action-grid {
     grid-template-columns: 1fr;
   }
 
