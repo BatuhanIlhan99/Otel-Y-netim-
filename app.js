@@ -1475,6 +1475,20 @@ function getCount(productId, date = todayKey()) {
   return state.counts[date]?.[productId] || null;
 }
 
+function productFallbackQty(productId) {
+  const product = state.products.find((item) => item.id === productId);
+  const existing = getTodayCount(productId);
+  return existing?.qty ?? product?.lastQty ?? 0;
+}
+
+function hasManualOrderRequest(count) {
+  return Boolean(count?.orderRequest?.requested);
+}
+
+function shouldOrderItem(item) {
+  return item.qty <= Number(item.product.minQty) || hasManualOrderRequest(item.count);
+}
+
 function setTodayCount(productId, qty, note = "", orderRequest = null) {
   const product = state.products.find((item) => item.id === productId);
   const date = todayKey();
@@ -1628,7 +1642,7 @@ function renderDashboard() {
       const qty = count ? count.qty : product.lastQty;
       return { product, count, qty };
     })
-    .filter((item) => item.qty <= item.product.minQty);
+    .filter((item) => item.qty <= item.product.minQty || hasManualOrderRequest(item.count));
   const departmentSummaries = departments.map((department) => {
     const products = activeProducts.filter((product) => product.departmentId === department.id);
     const counted = products.filter((product) => getTodayCount(product.id)).length;
@@ -1708,7 +1722,7 @@ function renderStats(date = todayKey()) {
   const critical = products.filter((product) => {
     const count = getCount(product.id, date);
     const qty = count ? count.qty : product.lastQty;
-    return qty <= product.minQty;
+    return qty <= product.minQty || hasManualOrderRequest(count);
   }).length;
   const completion = products.length ? Math.round((counted / products.length) * 100) : 0;
 
@@ -1716,7 +1730,7 @@ function renderStats(date = todayKey()) {
     <div class="grid stats">
       <div class="stat"><strong>${products.length}</strong><span>Aktif ürün</span></div>
       <div class="stat"><strong>${counted}</strong><span>Bugün sayılan</span></div>
-      <div class="stat"><strong>${critical}</strong><span>Kritik stok</span></div>
+      <div class="stat"><strong>${critical}</strong><span>Sipariş gereken</span></div>
       <div class="stat"><strong>%${completion}</strong><span>Tamamlanma</span></div>
     </div>
   `;
@@ -1740,6 +1754,7 @@ function renderCounting() {
       const requestQty = count?.orderRequest?.qty ?? "";
       const requestReason = count?.orderRequest?.reason ?? "";
       const isCritical = Number(qty || product.lastQty) <= product.minQty;
+      const statusLabel = requested ? "Siparis talebi" : isCritical ? "Kritik" : "Yeterli";
       return `
         <tr>
           <td data-label="Ürün"><strong>${escapeHtml(product.name)}</strong><br><span class="hint">${departmentName(product.departmentId)}</span></td>
@@ -1756,7 +1771,7 @@ function renderCounting() {
             </div>
           </td>
           <td data-label="Kaydeden">${count ? `${escapeHtml(count.user)}<br><span class="hint">${count.time}</span>` : "<span class=\"hint\">Bekliyor</span>"}</td>
-          <td data-label="Durum"><span class="badge ${isCritical ? "danger" : "ok"}">${isCritical ? "Kritik" : "Yeterli"}</span></td>
+          <td data-label="Durum"><span class="badge ${isCritical || requested ? "danger" : "ok"}">${statusLabel}</span></td>
         </tr>
       `;
     })
@@ -1818,7 +1833,7 @@ function renderReport() {
                 <th>Departman</th>
                 <th>Ürün</th>
                 <th>Sayılan</th>
-                <th>Kritik</th>
+                <th>Sipariş</th>
                 <th>Durum</th>
               </tr>
             </thead>
@@ -1882,7 +1897,7 @@ function renderDetailedReportTable(date = state.reportDate) {
         <td data-label="Onceki">${escapeHtml(row.previous)}</td>
         <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
         <td data-label="Sayim">${escapeHtml(row.counted || "Girilmedi")}</td>
-        <td data-label="Durum"><span class="badge ${row.status === "Kritik" || row.status === "Bekliyor" ? "danger" : "ok"}">${escapeHtml(row.status)}</span></td>
+        <td data-label="Durum"><span class="badge ${row.status === "Kritik" || row.status === "Bekliyor" || row.status === "Siparis Talebi" ? "danger" : "ok"}">${escapeHtml(row.status)}</span></td>
         <td data-label="Siparis">${escapeHtml(row.manualOrder)}</td>
         <td data-label="Talep">${escapeHtml(row.requestQty)}</td>
         <td data-label="Not">${escapeHtml(row.note || row.requestReason)}</td>
@@ -1927,7 +1942,7 @@ function reportRows(date = state.reportDate) {
       const counted = products.filter((product) => getCount(product.id, date)).length;
       const critical = products.filter((product) => {
         const count = getCount(product.id, date);
-        return (count ? count.qty : product.lastQty) <= product.minQty;
+        return (count ? count.qty : product.lastQty) <= product.minQty || hasManualOrderRequest(count);
       }).length;
       const complete = counted === products.length && products.length > 0;
       return `
@@ -1935,7 +1950,7 @@ function reportRows(date = state.reportDate) {
           <td data-label="Departman"><strong>${department.name}</strong></td>
           <td data-label="Ürün">${products.length}</td>
           <td data-label="Sayılan">${counted}</td>
-          <td data-label="Kritik">${critical}</td>
+          <td data-label="Sipariş">${critical}</td>
           <td data-label="Durum"><span class="badge ${complete ? "ok" : "danger"}">${complete ? "Tamamlandı" : "Eksik"}</span></td>
         </tr>
       `;
@@ -1955,14 +1970,16 @@ function buildDailyReportSnapshot(date = state.reportDate, departmentId = state.
     });
   const criticalItems = productStates.filter((item) => item.qty <= Number(item.product.minQty));
   const manualRequests = productStates.filter((item) => item.count?.orderRequest?.requested);
+  const orderNeededItems = productStates.filter(shouldOrderItem);
   const notCounted = productStates.filter((item) => !item.count);
   const departmentSummaries = departmentList.map((department) => {
     const products = productStates.filter((item) => item.product.departmentId === department.id);
     const counted = products.filter((item) => item.count).length;
     const critical = products.filter((item) => item.qty <= Number(item.product.minQty)).length;
     const manual = products.filter((item) => item.count?.orderRequest?.requested).length;
+    const orderNeeded = products.filter(shouldOrderItem).length;
     const completion = products.length ? Math.round((counted / products.length) * 100) : 0;
-    return { department, products: products.length, counted, missing: Math.max(products.length - counted, 0), critical, manual, completion };
+    return { department, products: products.length, counted, missing: Math.max(products.length - counted, 0), critical, manual, orderNeeded, completion };
   });
 
   return {
@@ -1970,6 +1987,7 @@ function buildDailyReportSnapshot(date = state.reportDate, departmentId = state.
     productStates,
     criticalItems,
     manualRequests,
+    orderNeededItems,
     notCounted,
     departmentSummaries,
   };
@@ -1989,29 +2007,34 @@ function buildMailReport() {
     `- Sayımı eksik ürün: ${snapshot.notCounted.length}`,
     `- Kritik stok: ${snapshot.criticalItems.length}`,
     `- Manuel sipariş talebi: ${snapshot.manualRequests.length}`,
+    `- Sipariş verilecek toplam ürün: ${snapshot.orderNeededItems.length}`,
     "",
     "Departman durumu:",
   ];
 
   snapshot.departmentSummaries.forEach((item) => {
-    lines.push(`- ${departmentStockTitle(item.department)}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Kritik: ${item.critical} | Manuel talep: ${item.manual}`);
+    lines.push(`- ${departmentStockTitle(item.department)}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Sipariş: ${item.orderNeeded} | Kritik: ${item.critical} | Manuel talep: ${item.manual}`);
   });
 
   lines.push("");
   lines.push("Sipariş verilmesi gereken ürünler:");
   lines.push("");
 
-  if (snapshot.criticalItems.length === 0) {
-    lines.push("Bugün minimum stok seviyesinin altında ürün bulunmuyor.");
+  if (snapshot.orderNeededItems.length === 0) {
+    lines.push("Bugün sipariş verilmesi gereken ürün bulunmuyor.");
     lines.push("");
   } else {
     snapshot.departmentSummaries.forEach(({ department }) => {
-      const departmentItems = snapshot.criticalItems.filter((item) => item.product.departmentId === department.id);
+      const departmentItems = snapshot.orderNeededItems.filter((item) => item.product.departmentId === department.id);
       if (departmentItems.length === 0) return;
       lines.push(departmentStockTitle(department));
       departmentItems.forEach(({ product, count, qty }) => {
         const note = count?.note ? ` | Not: ${count.note}` : "";
-        lines.push(`- ${product.name}: ${qty} ${product.unit} | Minimum: ${product.minQty} | Sipariş gerekli${note}`);
+        const request = count?.orderRequest?.requested ? count.orderRequest : null;
+        const requestedQty = request?.qty ? ` | Talep miktarı: ${request.qty} ${product.unit}` : "";
+        const reason = request?.reason ? ` | Gerekçe: ${request.reason}` : "";
+        const reasonLabel = qty <= Number(product.minQty) ? "Minimum altı" : "Manuel sipariş talebi";
+        lines.push(`- ${product.name}: ${qty} ${product.unit} | Minimum: ${product.minQty} | ${reasonLabel}${requestedQty}${reason}${note}`);
       });
       lines.push("");
     });
@@ -2083,9 +2106,9 @@ function reportFileStem(extension = "") {
 function reportProductRows(date = state.reportDate, departmentId = reportDepartmentId()) {
   const snapshot = buildDailyReportSnapshot(date, departmentId);
   return snapshot.productStates.map(({ product, count, qty }) => {
-    const counted = count ? Number(count.qty) : "";
-    const status = count ? (Number(count.qty) <= Number(product.minQty) ? "Kritik" : "Yeterli") : "Bekliyor";
     const orderRequest = count?.orderRequest || {};
+    const counted = count ? Number(count.qty) : "";
+    const status = count ? (orderRequest?.requested ? "Siparis Talebi" : Number(count.qty) <= Number(product.minQty) ? "Kritik" : "Yeterli") : "Bekliyor";
     return {
       date,
       department: departmentName(product.departmentId),
@@ -2118,12 +2141,14 @@ function reportSummaryText() {
     `Eksik sayim: ${snapshot.notCounted.length}`,
     `Kritik stok: ${snapshot.criticalItems.length}`,
     `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
+    `Siparis verilecek toplam urun: ${snapshot.orderNeededItems.length}`,
   ];
 
-  if (snapshot.criticalItems.length) {
+  if (snapshot.orderNeededItems.length) {
     lines.push("", "Siparis gereken ilk urunler:");
-    snapshot.criticalItems.slice(0, 12).forEach(({ product, qty }) => {
-      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${formatReportNumber(qty)} ${product.unit} | min ${formatReportNumber(product.minQty)}`);
+    snapshot.orderNeededItems.slice(0, 12).forEach(({ product, qty, count }) => {
+      const request = count?.orderRequest?.requested ? " | manuel talep" : "";
+      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${formatReportNumber(qty)} ${product.unit} | min ${formatReportNumber(product.minQty)}${request}`);
     });
   }
 
@@ -2262,6 +2287,7 @@ function buildPdfLines() {
     `Eksik sayim: ${snapshot.notCounted.length}`,
     `Kritik stok: ${snapshot.criticalItems.length}`,
     `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
+    `Siparis verilecek toplam urun: ${snapshot.orderNeededItems.length}`,
     "",
     "DEPARTMAN OZETI",
   ];
@@ -2392,6 +2418,7 @@ function buildPrintableReportHtml() {
       <td>${escapeHtml(departmentStockTitle(item.department))}</td>
       <td>${item.counted}/${item.products}</td>
       <td>%${item.completion}</td>
+      <td>${item.orderNeeded}</td>
       <td>${item.critical}</td>
       <td>${item.manual}</td>
       <td>${item.missing}</td>
@@ -2411,7 +2438,7 @@ function buildPrintableReportHtml() {
         h1 { font-size: 24px; }
         h2 { font-size: 16px; margin: 24px 0 10px; color: #0f6758; }
         .meta { color: #60716d; line-height: 1.5; text-align: right; }
-        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 16px 0; }
+        .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 16px 0; }
         .stat { border: 1px solid #d7e1de; border-radius: 8px; padding: 10px; }
         .stat strong { display: block; font-size: 20px; }
         .stat span { color: #60716d; font-size: 12px; }
@@ -2442,10 +2469,11 @@ function buildPrintableReportHtml() {
         <div class="stat"><strong>${snapshot.notCounted.length}</strong><span>Eksik</span></div>
         <div class="stat"><strong>${snapshot.criticalItems.length}</strong><span>Kritik</span></div>
         <div class="stat"><strong>${snapshot.manualRequests.length}</strong><span>Manuel talep</span></div>
+        <div class="stat"><strong>${snapshot.orderNeededItems.length}</strong><span>Siparis</span></div>
       </section>
       <h2>Departman ozeti</h2>
       <table>
-        <thead><tr><th>Departman</th><th>Sayim</th><th>Tamamlanma</th><th>Kritik</th><th>Manuel talep</th><th>Eksik</th></tr></thead>
+        <thead><tr><th>Departman</th><th>Sayim</th><th>Tamamlanma</th><th>Siparis</th><th>Kritik</th><th>Manuel talep</th><th>Eksik</th></tr></thead>
         <tbody>${departmentRows}</tbody>
       </table>
       <h2>Detayli stok raporu</h2>
@@ -2966,7 +2994,7 @@ function exportCsv() {
   const rows = visibleProducts().map((product) => {
     const count = getCount(product.id, state.reportDate);
     const qty = count?.qty ?? "";
-    const status = count ? (count.qty <= product.minQty ? "Kritik" : "Yeterli") : "Bekliyor";
+    const status = count ? (hasManualOrderRequest(count) ? "Siparis Talebi" : count.qty <= product.minQty ? "Kritik" : "Yeterli") : "Bekliyor";
     return [
       state.reportDate,
       departmentName(product.departmentId),
@@ -3074,15 +3102,17 @@ app.addEventListener("click", async (event) => {
 
   if (action === "save-counts") {
     document.querySelectorAll("[data-count]").forEach((input) => {
-      if (input.value !== "") {
-        const note = document.querySelector(`[data-note="${input.dataset.count}"]`)?.value || "";
-        const requested = document.querySelector(`[data-order-request="${input.dataset.count}"]`)?.checked || false;
-        const orderQty = document.querySelector(`[data-order-qty="${input.dataset.count}"]`)?.value || "";
-        const reason = document.querySelector(`[data-order-reason="${input.dataset.count}"]`)?.value || "";
+      const note = document.querySelector(`[data-note="${input.dataset.count}"]`)?.value || "";
+      const requestedByCheck = document.querySelector(`[data-order-request="${input.dataset.count}"]`)?.checked || false;
+      const orderQty = document.querySelector(`[data-order-qty="${input.dataset.count}"]`)?.value || "";
+      const reason = document.querySelector(`[data-order-reason="${input.dataset.count}"]`)?.value || "";
+      const requested = requestedByCheck || String(orderQty).trim() !== "" || String(reason).trim() !== "";
+      if (input.value !== "" || requested || note.trim() !== "") {
+        const qty = input.value !== "" ? input.value : productFallbackQty(input.dataset.count);
         const orderRequest = requested
           ? { requested: true, qty: Number(orderQty || 0), reason }
           : { requested: false, qty: 0, reason: "" };
-        setTodayCount(input.dataset.count, input.value, note, orderRequest);
+        setTodayCount(input.dataset.count, qty, note, orderRequest);
       }
     });
     render();

@@ -441,8 +441,23 @@ function buildDailyReport(db, date, departmentId = "all") {
   });
 
   const orderItems = productStates
-    .filter((item) => item.qty <= item.minQty)
-    .map(({ orderRequest, ...item }) => item);
+    .filter((item) => item.qty <= item.minQty || item.orderRequest.requested)
+    .map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      departmentId: item.departmentId,
+      departmentName: item.departmentName,
+      unit: item.unit,
+      qty: item.qty,
+      minQty: item.minQty,
+      counted: item.counted,
+      note: item.note,
+      user: item.user,
+      time: item.time,
+      requestedQty: item.orderRequest.requestedQty,
+      reason: item.orderRequest.reason,
+      manualRequest: item.orderRequest.requested,
+    }));
 
   const manualOrderRequests = productStates
     .filter((item) => item.orderRequest.requested)
@@ -465,6 +480,7 @@ function buildDailyReport(db, date, departmentId = "all") {
       const counted = products.filter((item) => item.counted).length;
       const critical = products.filter((item) => item.qty <= item.minQty).length;
       const manual = products.filter((item) => item.orderRequest.requested).length;
+      const orderNeeded = products.filter((item) => item.qty <= item.minQty || item.orderRequest.requested).length;
       const completion = products.length ? Math.round((counted / products.length) * 100) : 0;
       return {
         departmentId: department.id,
@@ -474,6 +490,7 @@ function buildDailyReport(db, date, departmentId = "all") {
         missing: Math.max(products.length - counted, 0),
         critical,
         manualRequests: manual,
+        orderNeeded,
         completion,
         complete: products.length > 0 && counted === products.length,
       };
@@ -491,7 +508,8 @@ function buildDailyReport(db, date, departmentId = "all") {
       activeProducts: productStates.length,
       countedProducts: productStates.filter((item) => item.counted).length,
       missingCounts: notCountedItems.length,
-      criticalItems: orderItems.length,
+      criticalItems: productStates.filter((item) => item.qty <= item.minQty).length,
+      orderNeededItems: orderItems.length,
       manualRequests: manualOrderRequests.length,
       incompleteDepartments: departmentSummaries.filter((item) => !item.complete).length,
     },
@@ -526,12 +544,13 @@ function buildOrderReportMail(db, date, departmentId = "all") {
     `- Sayımı eksik ürün: ${report.totals.missingCounts}`,
     `- Kritik stok: ${report.totals.criticalItems}`,
     `- Manuel sipariş talebi: ${report.totals.manualRequests}`,
+    `- Sipariş verilecek toplam ürün: ${report.totals.orderNeededItems}`,
     "",
     "Departman durumu:",
   ];
 
   for (const item of report.departmentSummaries) {
-    lines.push(`- ${item.departmentName}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Kritik: ${item.critical} | Manuel talep: ${item.manualRequests}`);
+    lines.push(`- ${item.departmentName}: ${item.counted}/${item.products} sayıldı | %${item.completion} | Sipariş: ${item.orderNeeded} | Kritik: ${item.critical} | Manuel talep: ${item.manualRequests}`);
   }
 
   lines.push("");
@@ -539,7 +558,7 @@ function buildOrderReportMail(db, date, departmentId = "all") {
   lines.push("");
 
   if (report.orderItems.length === 0) {
-    lines.push("Bugün minimum stok seviyesinin altında ürün bulunmuyor.");
+    lines.push("Bugün sipariş verilmesi gereken ürün bulunmuyor.");
     lines.push("");
   } else {
     const grouped = new Map();
@@ -552,7 +571,10 @@ function buildOrderReportMail(db, date, departmentId = "all") {
       lines.push(groupName);
       for (const item of groupItems) {
         const note = item.note ? ` | Not: ${item.note}` : "";
-        lines.push(`- ${item.productName}: ${item.qty} ${item.unit} | Minimum: ${item.minQty} | Sipariş gerekli${note}`);
+        const requestedQty = item.requestedQty ? ` | Talep miktarı: ${item.requestedQty} ${item.unit}` : "";
+        const reason = item.reason ? ` | Gerekçe: ${item.reason}` : "";
+        const reasonLabel = item.qty <= item.minQty ? "Minimum altı" : "Manuel sipariş talebi";
+        lines.push(`- ${item.productName}: ${item.qty} ${item.unit} | Minimum: ${item.minQty} | ${reasonLabel}${requestedQty}${reason}${note}`);
       }
       lines.push("");
     }
@@ -604,6 +626,7 @@ function buildOrderReportHtml(db, date, departmentId = "all") {
       <td>${escapeHtml(item.departmentName)}</td>
       <td>${item.counted}/${item.products}</td>
       <td>%${item.completion}</td>
+      <td>${item.orderNeeded}</td>
       <td>${item.critical}</td>
       <td>${item.manualRequests}</td>
       <td>${item.complete ? "Tamamlandı" : "Eksik"}</td>
@@ -616,21 +639,21 @@ function buildOrderReportHtml(db, date, departmentId = "all") {
       <p style="margin:0 0 18px;color:#60716d">Tarih: ${escapeHtml(date)} | Oluşturma: ${escapeHtml(new Date(report.generatedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }))}</p>
       <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
         <tr style="background:#eef4f2">
-          <th align="left">Aktif ürün</th><th align="left">Sayılan</th><th align="left">Eksik</th><th align="left">Kritik</th><th align="left">Manuel talep</th>
+          <th align="left">Aktif ürün</th><th align="left">Sayılan</th><th align="left">Eksik</th><th align="left">Sipariş</th><th align="left">Kritik</th><th align="left">Manuel talep</th>
         </tr>
         <tr>
-          <td>${report.totals.activeProducts}</td><td>${report.totals.countedProducts}</td><td>${report.totals.missingCounts}</td><td>${report.totals.criticalItems}</td><td>${report.totals.manualRequests}</td>
+          <td>${report.totals.activeProducts}</td><td>${report.totals.countedProducts}</td><td>${report.totals.missingCounts}</td><td>${report.totals.orderNeededItems}</td><td>${report.totals.criticalItems}</td><td>${report.totals.manualRequests}</td>
         </tr>
       </table>
       <h3>Departman durumu</h3>
       <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
-        <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Sayım</th><th align="left">Tamamlanma</th><th align="left">Kritik</th><th align="left">Manuel</th><th align="left">Durum</th></tr>
+        <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Sayım</th><th align="left">Tamamlanma</th><th align="left">Sipariş</th><th align="left">Kritik</th><th align="left">Manuel</th><th align="left">Durum</th></tr>
         ${departmentRows}
       </table>
       <h3>Sipariş verilmesi gereken ürünler</h3>
       <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
         <tr style="background:#f9e8e8"><th align="left">Departman</th><th align="left">Ürün</th><th align="left">Mevcut</th><th align="left">Minimum</th><th align="left">Talep</th><th align="left">Not</th></tr>
-        ${rows(report.orderItems, "Bugün minimum stok seviyesinin altında ürün bulunmuyor.")}
+        ${rows(report.orderItems, "Bugün sipariş verilmesi gereken ürün bulunmuyor.")}
       </table>
       <h3>Manuel sipariş talepleri</h3>
       <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
@@ -1140,6 +1163,7 @@ async function handleApi(req, res, url) {
       totals: report.totals,
       departmentSummaries: report.departmentSummaries,
       orderItems: report.orderItems,
+      orderNeededItems: report.orderItems,
       manualOrderRequests: report.manualOrderRequests,
       notCountedItems: report.notCountedItems,
       mailText: buildOrderReportMail(db, date, departmentId),
