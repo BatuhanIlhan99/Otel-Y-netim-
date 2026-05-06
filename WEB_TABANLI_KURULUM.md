@@ -23,11 +23,21 @@ Render Blueprint acarken gizli alanlara su degerler girilir:
 - `SMTP_PASS`
 - `SMTP_FROM`
 
+Uretim icin `render.yaml` su kritik degerleri de hazirlar:
+
+- `PORT=10000`
+- `HOST=0.0.0.0`
+- `DATA_DIR=/var/data`
+- `ALLOWED_ORIGINS=https://batuhanilhan99.github.io`
+- Kalici disk: `/var/data`, 1 GB
+
 Servis yayina girdikten sonra kullanilacak adres su formatta olur:
 
 `https://otel-yonetim.onrender.com`
 
 Bu adres tum cihazlarda acilirsa uygulama tamamen web tabanli calisir.
+
+Yayindan sonra `BULUT_BACKEND_TEST.cmd` calistirilir. Test; `/api/health`, admin login, ortak veri ve mail durumunu kontrol eder.
 
 ## GitHub Pages kullanilacaksa
 
@@ -40,3 +50,5 @@ window.OTEL_CONFIG = {
 ```
 
 Bu yapilmadan GitHub Pages uzerinden mail gonderimi ve ortak stok verisi calismaz.
+
+Backend adresi hazir olduktan sonra `BULUT_API_ADRESI_KAYDET.cmd` calistirilir. Bu dosya `config.js` icine bulut API adresini yazar ve istenirse GitHub Pages'i hemen deploy eder.

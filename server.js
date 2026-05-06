@@ -13,11 +13,13 @@ const BACKUP_DIR = path.join(DATA_DIR, "backups");
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 const MAX_BODY_BYTES = 1_000_000;
 const MAIL_LOG_LIMIT = 500;
+const DEFAULT_ALLOWED_ORIGINS = ["https://batuhanilhan99.github.io"];
 
 loadEnvFile(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || (process.env.RENDER || process.env.RAILWAY_ENVIRONMENT ? "0.0.0.0" : "127.0.0.1");
+const ALLOWED_ORIGINS = parseListEnv("ALLOWED_ORIGINS", DEFAULT_ALLOWED_ORIGINS);
 const sessions = new Map();
 
 const MIME_TYPES = {
@@ -50,6 +52,43 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function parseListEnv(name, fallback = []) {
+  const raw = process.env[name];
+  const values = String(raw || "")
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return values.length > 0 ? values : fallback;
+}
+
+function originAllowed(origin) {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.includes("*") || ALLOWED_ORIGINS.includes(origin);
+}
+
+function corsHeaders(res) {
+  const origin = res._otelRequestOrigin || "";
+  const headers = {
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
+    "Vary": "Origin",
+  };
+  if (!origin) {
+    headers["Access-Control-Allow-Origin"] = "*";
+  } else if (originAllowed(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+function securityHeaders() {
+  return {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "same-origin",
+  };
+}
+
 function readJson(filePath, fallback) {
   try {
     if (!fs.existsSync(filePath)) return clone(fallback);
@@ -66,6 +105,27 @@ function writeJsonAtomic(filePath, value) {
   const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmpPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   fs.renameSync(tmpPath, filePath);
+}
+
+function storageHealth() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const probePath = path.join(DATA_DIR, `.health-${process.pid}-${Date.now()}.tmp`);
+    fs.writeFileSync(probePath, "ok", "utf8");
+    fs.unlinkSync(probePath);
+    return {
+      ok: true,
+      dataDir: process.env.DATA_DIR ? "configured" : "default",
+      persistent: Boolean(process.env.DATA_DIR),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      dataDir: process.env.DATA_DIR ? "configured" : "default",
+      persistent: Boolean(process.env.DATA_DIR),
+      message: error.message,
+    };
+  }
 }
 
 function backupDataFile() {
@@ -791,9 +851,9 @@ function sendJson(res, status, payload) {
   const body = JSON.stringify(payload, null, 2);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
+    "Cache-Control": "no-store",
+    ...corsHeaders(res),
+    ...securityHeaders(),
   });
   res.end(body);
 }
@@ -801,7 +861,8 @@ function sendJson(res, status, payload) {
 function sendText(res, status, text) {
   res.writeHead(status, {
     "Content-Type": "text/plain; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
+    ...corsHeaders(res),
+    ...securityHeaders(),
   });
   res.end(text);
 }
@@ -898,9 +959,13 @@ function serveStatic(req, res, pathname) {
     return;
   }
   const ext = path.extname(filePath).toLowerCase();
+  const cacheControl = path.basename(filePath) === "config.js"
+    ? "no-store"
+    : "public, max-age=300";
   res.writeHead(200, {
     "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
-    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": cacheControl,
+    ...securityHeaders(),
   });
   fs.createReadStream(filePath).pipe(res);
 }
@@ -914,6 +979,11 @@ async function handleApi(req, res, url) {
       ok: true,
       app: "otel-yonetim",
       time: new Date().toISOString(),
+      uptimeSeconds: Math.round(process.uptime()),
+      host: HOST,
+      port: PORT,
+      storage: storageHealth(),
+      allowedOrigins: ALLOWED_ORIGINS,
       smtp: validateSmtpConfig(),
     });
     return;
@@ -1168,7 +1238,12 @@ async function handleApi(req, res, url) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    res._otelRequestOrigin = req.headers.origin || "";
     if (req.method === "OPTIONS") {
+      if (!originAllowed(res._otelRequestOrigin)) {
+        sendText(res, 403, "CORS origin not allowed");
+        return;
+      }
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -1193,8 +1268,23 @@ setInterval(() => {
 }, 60_000);
 
 loadDb();
+runDueAutomations().catch((error) => {
+  console.error("Baslangic otomasyon hatasi", error);
+});
 
 server.listen(PORT, HOST, () => {
   console.log(`Otel Yonetim backend calisiyor: http://${HOST}:${PORT}/`);
   console.log("SMTP_ENABLED=true yapilmadikca mailler data/mail-log.json dosyasina yazilir.");
+});
+
+function shutdown(signal) {
+  console.log(`${signal} alindi, backend kapatiliyor...`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("unhandledRejection", (error) => {
+  console.error("Yakalanmamis promise hatasi", error);
 });

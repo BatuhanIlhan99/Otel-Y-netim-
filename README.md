@@ -27,6 +27,7 @@ Bu klasör, otel içinde günlük stok sayımı, kritik stok raporu, personel ha
 - Masaüstü yönetim paneli ve mobil personel kullanımı için responsive arayüz
 - Token bazlı backend oturumu ve rol bazlı API yetkisi
 - SMTP doğrulama, mail loglama ve otomatik zamanlayıcı
+- Render uyumlu bulut backend, kalıcı disk ve GitHub Pages API bağlantı hazırlığı
 
 ## Departmanlar
 
@@ -84,6 +85,32 @@ Gerçek otomatik mail için `.env` dosyası oluşturup SMTP bilgileri girilmelid
 Örnek SMTP ayarları için `.env.example` dosyasına bak.
 
 Detaylı mail kurulumu için `MAIL_KURULUMU.md`, canlıya alma kontrolü için `PRODUCTION_CHECKLIST.md` dosyasına bak.
+
+## Bulut backend
+
+Gerçek web tabanlı kullanım için herkesin aynı backend adresinden girmesi gerekir. Render kurulumu için `render.yaml` hazırdır.
+
+Tek tık Render kurulumu:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https%3A%2F%2Fgithub.com%2FBatuhanIlhan99%2FOtel-Y-netim-)
+
+Kurulum rehberi:
+
+```text
+BULUT_BACKEND_KURULUM.md
+```
+
+Yayınlanan backend'i test etmek için:
+
+```text
+BULUT_BACKEND_TEST.cmd
+```
+
+GitHub Pages arayüzünü bulut backend'e bağlamak için:
+
+```text
+BULUT_API_ADRESI_KAYDET.cmd
+```
 
 ## GitHub notu
 

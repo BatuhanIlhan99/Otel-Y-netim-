@@ -12,10 +12,16 @@ services:
       mountPath: /var/data
       sizeGB: 1
     envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
       - key: HOST
         value: 0.0.0.0
       - key: DATA_DIR
         value: /var/data
+      - key: ALLOWED_ORIGINS
+        value: https://batuhanilhan99.github.io
       - key: SMTP_ENABLED
         value: "true"
       - key: SMTP_HOST
@@ -32,3 +38,7 @@ services:
         value: Otel Yonetim Stok
       - key: SMTP_SECURE
         value: "false"
+      - key: SMTP_TIMEOUT_MS
+        value: "15000"
+      - key: MAIL_CATCH_UP_MINUTES
+        value: "120"

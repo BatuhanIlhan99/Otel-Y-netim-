@@ -5,8 +5,10 @@
 - Varsayılan demo şifreleri değiştirilecek.
 - `.env` dosyası GitHub'a yüklenmeyecek.
 - SMTP şifresi yalnızca `.env` içinde tutulacak.
+- Bulut ortamda SMTP şifreleri Render Environment/Secret alanlarında tutulacak.
 - Yönetici kullanıcıları sınırlı tutulacak.
 - Sunucu dışarı açılacaksa HTTPS arkasında çalıştırılacak.
+- GitHub Pages API bağlantısı kullanılacaksa `ALLOWED_ORIGINS` içinde `https://batuhanilhan99.github.io` bulunacak.
 
 ## Operasyon
 
@@ -17,15 +19,19 @@
 - Hatırlatma ve rapor saatleri operasyon saatlerine göre ayarlanacak.
 - `Mail Ayarları` ekranında SMTP kontrolü, manuel hatırlatma gönderimi ve manuel yönetici raporu gönderimi test edilecek.
 - `data/mail-log.json` içinde test kayıtlarının oluştuğu, `data/mail-state.json` içinde günlük otomasyon kaydının tutulduğu doğrulanacak.
+- Bulut yayından sonra `BULUT_BACKEND_TEST.cmd` ile `/api/health`, admin login ve mail durumu doğrulanacak.
 
 ## Yedekleme
 
 - `data/app-data.json` düzenli yedeklenecek.
 - Backend her yazma işleminden önce `data/backups` klasörüne kopya alır.
+- Render kurulumunda kalıcı disk `/var/data` olarak bağlı olacak; disk yoksa veriler restart/deploy sonrası kalıcı kabul edilmeyecek.
 - Kritik kullanımda JSON yerine PostgreSQL/MySQL'e geçiş planlanmalı.
 
 ## Canlıya Alma
 
 - Backend Node.js ile başlatılacak.
 - `http://localhost:8787/` yerine gerçek alan adı veya otel içi sunucu adresi kullanılacak.
+- Render servisinde `PORT=10000`, `HOST=0.0.0.0`, `DATA_DIR=/var/data` ayarlı olacak.
+- Bulut adresi hazırsa `BULUT_API_ADRESI_KAYDET.cmd` ile GitHub Pages API bağlantısı güncellenecek.
 - SMTP kontrolü başarıyla geçmeden otomasyon canlıya alınmayacak.
