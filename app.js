@@ -3001,39 +3001,6 @@ function reportSummaryText() {
   }
 
   return lines.join("\n");
-  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
-  const counted = snapshot.productStates.length - snapshot.notCounted.length;
-  const lines = [
-    `Otel Yonetim stok raporu`,
-    `Tarih: ${state.reportDate}`,
-    `Kapsam: ${reportScopeLabel()}`,
-    `Aktif urun: ${snapshot.productStates.length}`,
-    `Sayilan urun: ${counted}`,
-    `Eksik sayim: ${snapshot.notCounted.length}`,
-    `Kritik stok: ${snapshot.criticalItems.length}`,
-    `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
-    `Siparis verilecek toplam urun: ${snapshot.orderNeededItems.length}`,
-  ];
-
-  if (snapshot.orderNeededItems.length) {
-    lines.push("", "Siparis gereken ilk urunler:");
-    snapshot.orderNeededItems.slice(0, 12).forEach(({ product, qty, count }) => {
-      const request = count?.orderRequest?.requested ? " | manuel talep" : "";
-      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${formatReportNumber(qty)} ${product.unit} | min ${formatReportNumber(product.minQty)}${request}`);
-    });
-  }
-
-  if (snapshot.manualRequests.length) {
-    lines.push("", "Manuel siparis talepleri:");
-    snapshot.manualRequests.slice(0, 12).forEach(({ product, count }) => {
-      const request = count.orderRequest || {};
-      const qty = request.qty ? `${formatReportNumber(request.qty)} ${product.unit}` : "miktar belirtilmedi";
-      const reason = request.reason ? ` | ${request.reason}` : "";
-      lines.push(`- ${departmentName(product.departmentId)} / ${product.name}: ${qty}${reason}`);
-    });
-  }
-
-  return lines.join("\n");
 }
 
 function downloadBlob(blob, fileName) {
@@ -3237,35 +3204,6 @@ function buildPdfLines() {
   }
 
   return lines.map(toPdfText);
-  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
-  const lines = [
-    "OTEL YONETIM STOK RAPORU",
-    `Tarih: ${state.reportDate}`,
-    `Kapsam: ${reportScopeLabel()}`,
-    `Olusturan: ${state.user?.name || ""}`,
-    "",
-    `Aktif urun: ${snapshot.productStates.length}`,
-    `Sayilan urun: ${snapshot.productStates.length - snapshot.notCounted.length}`,
-    `Eksik sayim: ${snapshot.notCounted.length}`,
-    `Kritik stok: ${snapshot.criticalItems.length}`,
-    `Manuel siparis talebi: ${snapshot.manualRequests.length}`,
-    `Siparis verilecek toplam urun: ${snapshot.orderNeededItems.length}`,
-    "",
-    "DEPARTMAN OZETI",
-  ];
-
-  snapshot.departmentSummaries.forEach((item) => {
-    lines.push(`${departmentStockTitle(item.department)} | ${item.counted}/${item.products} | %${item.completion} | Kritik ${item.critical} | Manuel ${item.manual}`);
-  });
-
-  lines.push("", "DETAYLI STOK LISTESI");
-  reportProductRows().forEach((row) => {
-    const request = row.manualOrder === "Evet" ? ` | Talep: ${row.requestQty || "var"} ${row.requestReason}` : "";
-    const note = row.note ? ` | Not: ${row.note}` : "";
-    lines.push(`${row.department} / ${row.product}: ${row.counted || "Girilmedi"} ${row.unit} | Min ${row.minimum} | ${row.status}${request}${note}`);
-  });
-
-  return lines.map(toPdfText);
 }
 
 function buildPdfBlobFromLines(lines) {
@@ -3437,92 +3375,6 @@ function buildPrintableReportHtml() {
       ${buildPrintableIssueTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
       ${buildPrintableIssueTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
       <p class="note">Normal stok kalemleri sistemde saklanır; satın alma aksiyonu gerektirmediği için bu kurumsal rapora dahil edilmez.</p>
-    </body>
-  </html>`;
-  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
-  const rows = reportProductRows();
-  const detailRows = rows.map((row) => `
-    <tr>
-      <td>${escapeHtml(row.department)}</td>
-      <td><strong>${escapeHtml(row.product)}</strong></td>
-      <td>${escapeHtml(row.unit)}</td>
-      <td>${escapeHtml(row.previous)}</td>
-      <td>${escapeHtml(row.minimum)}</td>
-      <td>${escapeHtml(row.counted || "Girilmedi")}</td>
-      <td>${escapeHtml(row.status)}</td>
-      <td>${escapeHtml(row.manualOrder)}</td>
-      <td>${escapeHtml(row.requestQty)}</td>
-      <td>${escapeHtml(row.note || row.requestReason)}</td>
-    </tr>
-  `).join("");
-  const departmentRows = snapshot.departmentSummaries.map((item) => `
-    <tr>
-      <td>${escapeHtml(departmentStockTitle(item.department))}</td>
-      <td>${item.counted}/${item.products}</td>
-      <td>%${item.completion}</td>
-      <td>${item.orderNeeded}</td>
-      <td>${item.critical}</td>
-      <td>${item.manual}</td>
-      <td>${item.missing}</td>
-    </tr>
-  `).join("");
-
-  return `<!doctype html>
-  <html lang="tr">
-    <head>
-      <meta charset="utf-8">
-      <title>Stok Raporu ${escapeHtml(state.reportDate)}</title>
-      <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 28px; color: #16211f; font-family: Arial, Helvetica, sans-serif; }
-        header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #0f6758; padding-bottom: 16px; margin-bottom: 18px; }
-        h1, h2 { margin: 0; }
-        h1 { font-size: 24px; }
-        h2 { font-size: 16px; margin: 24px 0 10px; color: #0f6758; }
-        .meta { color: #60716d; line-height: 1.5; text-align: right; }
-        .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 16px 0; }
-        .stat { border: 1px solid #d7e1de; border-radius: 8px; padding: 10px; }
-        .stat strong { display: block; font-size: 20px; }
-        .stat span { color: #60716d; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
-        tr { page-break-inside: avoid; page-break-after: auto; }
-        th, td { border: 1px solid #d7e1de; padding: 7px 8px; text-align: left; vertical-align: top; font-size: 12px; }
-        th { background: #eef4f2; color: #0f6758; text-transform: uppercase; font-size: 11px; }
-        @page { size: A4 landscape; margin: 12mm; }
-        @media print { body { padding: 0; } .no-print { display: none; } }
-      </style>
-    </head>
-    <body>
-      <button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:10px 14px;border:0;border-radius:8px;background:#0f6758;color:white;font-weight:700">PDF / Yazdir</button>
-      <header>
-        <div>
-          <h1>Otel Yonetim Stok Raporu</h1>
-          <p>Kritik stok, manuel siparis talepleri ve departman sayim durumu</p>
-        </div>
-        <div class="meta">
-          <strong>Tarih:</strong> ${escapeHtml(state.reportDate)}<br>
-          <strong>Kapsam:</strong> ${escapeHtml(reportScopeLabel())}<br>
-          <strong>Olusturan:</strong> ${escapeHtml(state.user?.name || "")}
-        </div>
-      </header>
-      <section class="stats">
-        <div class="stat"><strong>${snapshot.productStates.length}</strong><span>Aktif urun</span></div>
-        <div class="stat"><strong>${snapshot.productStates.length - snapshot.notCounted.length}</strong><span>Sayilan</span></div>
-        <div class="stat"><strong>${snapshot.notCounted.length}</strong><span>Eksik</span></div>
-        <div class="stat"><strong>${snapshot.criticalItems.length}</strong><span>Kritik</span></div>
-        <div class="stat"><strong>${snapshot.manualRequests.length}</strong><span>Manuel talep</span></div>
-        <div class="stat"><strong>${snapshot.orderNeededItems.length}</strong><span>Siparis</span></div>
-      </section>
-      <h2>Departman ozeti</h2>
-      <table>
-        <thead><tr><th>Departman</th><th>Sayim</th><th>Tamamlanma</th><th>Siparis</th><th>Kritik</th><th>Manuel talep</th><th>Eksik</th></tr></thead>
-        <tbody>${departmentRows}</tbody>
-      </table>
-      <h2>Detayli stok raporu</h2>
-      <table>
-        <thead><tr><th>Departman</th><th>Urun</th><th>Birim</th><th>Onceki</th><th>Minimum</th><th>Sayim</th><th>Durum</th><th>Siparis</th><th>Talep</th><th>Not</th></tr></thead>
-        <tbody>${detailRows}</tbody>
-      </table>
     </body>
   </html>`;
 }
