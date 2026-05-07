@@ -413,6 +413,11 @@ tbody tr:hover {
   color: var(--ok);
 }
 
+.badge.warn {
+  background: #fff5d9;
+  color: #8a5a0a;
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -713,6 +718,211 @@ tbody tr:hover {
   min-width: 980px;
 }
 
+.report-filter-panel .panel-head {
+  align-items: flex-start;
+}
+
+.executive-report-summary {
+  overflow: hidden;
+}
+
+.executive-report-brand {
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  background: #fbfcfc;
+}
+
+.executive-report-brand h3 {
+  margin: 0 0 5px;
+  font-size: 22px;
+  line-height: 1.18;
+}
+
+.executive-report-brand span:not(.badge) {
+  color: var(--muted);
+}
+
+.executive-summary-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.executive-summary-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.executive-summary-grid strong {
+  font-size: 28px;
+  color: var(--brand-strong);
+}
+
+.executive-summary-grid span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-issue-panel .panel-head {
+  align-items: flex-start;
+}
+
+.report-action-table table {
+  min-width: 940px;
+}
+
+.executive-mail-preview {
+  max-height: 520px;
+  overflow: auto;
+  background: #fbfcfc;
+}
+
+.portion-control-panel,
+.portion-actions-panel {
+  overflow: visible;
+}
+
+.portion-control-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(120px, 0.6fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 0.8fr) minmax(140px, 0.7fr) minmax(130px, auto);
+  gap: 12px;
+  align-items: end;
+}
+
+.portion-control-grid label,
+.portion-note-box label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.portion-summary-panel {
+  overflow: hidden;
+}
+
+.portion-summary-head {
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  background: #fbfcfc;
+  border-bottom: 1px solid var(--line);
+}
+
+.portion-summary-head h3 {
+  margin: 0 0 5px;
+  font-size: 23px;
+  line-height: 1.18;
+}
+
+.portion-summary-head span:not(.badge) {
+  color: var(--muted);
+}
+
+.portion-summary-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.portion-summary-grid div,
+.portion-method-box,
+.portion-note-box {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+  min-width: 0;
+}
+
+.portion-summary-grid div {
+  display: grid;
+  gap: 4px;
+}
+
+.portion-summary-grid strong {
+  font-size: 28px;
+  color: var(--brand-strong);
+}
+
+.portion-summary-grid span,
+.portion-method-box span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.portion-issue-panel .panel-head,
+.portion-reference-panel .panel-head {
+  align-items: flex-start;
+}
+
+.portion-table table {
+  min-width: 980px;
+}
+
+.portion-table.compact table {
+  min-width: 900px;
+}
+
+.portion-reference-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 12px;
+}
+
+.portion-method-box {
+  display: grid;
+  gap: 8px;
+  background: #fbfcfc;
+}
+
+.portion-note-box {
+  display: grid;
+  gap: 12px;
+}
+
+.portion-note-box textarea {
+  min-height: 122px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.portion-unmapped {
+  border-top: 1px solid var(--line);
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.portion-unmapped span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fbfcfc;
+  color: var(--muted);
+}
+
 .settings-list {
   padding: 16px;
   display: grid;
@@ -796,7 +1006,11 @@ tbody tr:hover {
   .mail-settings-layout,
   .mail-status-grid,
   .report-action-grid,
+  .executive-summary-grid,
   .executive-layout,
+  .portion-control-grid,
+  .portion-summary-grid,
+  .portion-reference-grid,
   .admin-products-layout,
   .form-grid,
   .quick-product-grid,
@@ -934,7 +1148,9 @@ tbody tr:hover {
   }
 
   .topbar,
-  .panel-head {
+  .panel-head,
+  .executive-report-brand,
+  .portion-summary-head {
     flex-direction: column;
     align-items: stretch;
   }

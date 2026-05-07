@@ -15,6 +15,84 @@ const users = [
   { username: "resepsiyon", password: "Resepsiyon2026", name: "Resepsiyon Kullanıcısı", role: "staff", departmentId: "resepsiyon" },
 ];
 
+const foodDepartmentIds = ["gulplaj-restorant", "gulplaj-bufe", "smile-food-house"];
+
+const portionProfiles = {
+  "hotel-buffet": {
+    label: "Otel açık büfe",
+    multiplier: 1.1,
+    beverageMultiplier: 1.2,
+    serviceMultiplier: 0.75,
+    defaultBuffer: 14,
+    description: "Ana öğün, açık servis ve ikinci tabak ihtimalini hesaba katar.",
+  },
+  "plated-service": {
+    label: "Tabak servis / alakart",
+    multiplier: 0.92,
+    beverageMultiplier: 0.9,
+    serviceMultiplier: 0.45,
+    defaultBuffer: 10,
+    description: "Standart reçete ve kontrollü porsiyon servisi için daha düşük fire kullanır.",
+  },
+  "beach-cafe": {
+    label: "Plaj kafe / büfe",
+    multiplier: 0.82,
+    beverageMultiplier: 1.45,
+    serviceMultiplier: 1.15,
+    defaultBuffer: 16,
+    description: "İçecek, paket ürün ve tek kullanımlık servis malzemesi ağırlıklıdır.",
+  },
+  "fast-food": {
+    label: "Fast food yoğun servis",
+    multiplier: 1.0,
+    beverageMultiplier: 1.05,
+    serviceMultiplier: 1.35,
+    defaultBuffer: 12,
+    description: "Burger, makarna, patates, sos ve paketleme akışına göre hesaplar.",
+  },
+};
+
+const portionRules = [
+  { id: "burger-box", label: "Burger paket kutusu", keywords: ["burger kutusu"], unit: "adet", perGuest: 1, demand: 0.36, kind: "service" },
+  { id: "fries-box", label: "Patates servis kutusu", keywords: ["patates kutusu"], unit: "adet", perGuest: 1, demand: 0.42, kind: "service" },
+  { id: "pasta-box", label: "Makarna servis kutusu", keywords: ["makarna kutusu"], unit: "adet", perGuest: 1, demand: 0.24, kind: "service" },
+  { id: "salad-bowl", label: "Salata / kase ambalajı", keywords: ["salata kasesi", "karton kase", "dondurma kabi"], unit: "adet", perGuest: 1, demand: 0.28, kind: "service" },
+  { id: "cup-service", label: "Bardak ve kapak", keywords: ["karton bardak", "icecek bardagi", "bardak kapagi", "sicak bardak", "soguk bardak", "dome kapak", "bardak sleeve"], unit: "adet", perGuest: 1, demand: 0.62, kind: "service" },
+  { id: "cutlery-service", label: "Tek kullanımlık servis seti", keywords: ["plastik catal", "plastik kasik", "plastik bicak", "tek kullanimlik catal", "tek kullanimlik kasik", "tek kullanimlik bicak", "dondurma kasigi", "pipet", "karistirici cubuk", "servis tabagi", "sos kabi"], unit: "adet", perGuest: 1, demand: 0.55, kind: "service" },
+  { id: "napkin-service", label: "Peçete / ıslak mendil", keywords: ["pecete", "islak mendil"], unit: "adet", perGuest: 2, demand: 0.7, kind: "service" },
+  { id: "takeaway-bag", label: "Paket servis poşeti", keywords: ["paket servis poseti", "kraft kese", "sandvic kutusu", "tost kutusu"], unit: "adet", perGuest: 1, demand: 0.26, kind: "service" },
+  { id: "water", label: "Kişi başı su", keywords: ["su 500", "su 330", "su 1.5", "vitaminli su", "hindistan cevizi suyu"], unit: "adet", perGuest: 1, demand: 0.82, kind: "beverage" },
+  { id: "cold-drink", label: "Soğuk içecek", keywords: ["kola", "gazoz", "ice tea", "enerji icecegi", "sporcu icecegi", "meyve suyu", "visne suyu", "elma suyu", "portakal suyu", "ayran", "kefir", "soda", "maden suyu", "soguk kahve", "protein icecegi"], unit: "adet", perGuest: 1, demand: 0.36, kind: "beverage" },
+  { id: "lemonade", label: "Limonata / konsantre", keywords: ["limonata"], unit: "lt", perGuest: 0.22, demand: 0.34, kind: "beverage" },
+  { id: "ice", label: "Servis buzu", keywords: ["soguk icecek buzu", "icecek buzu", "buz torbasi"], unit: "kg", perGuest: 0.18, demand: 0.55, kind: "beverage" },
+  { id: "coffee-capsule", label: "Kapsül kahve", keywords: ["kapsul kahve"], unit: "adet", perGuest: 1, demand: 0.18, kind: "beverage" },
+  { id: "coffee", label: "Kahve çekirdeği / toz kahve", keywords: ["espresso", "filtre kahve", "turk kahvesi", "nescafe", "kafeinsiz kahve", "cekirdek kahve"], unit: "kg", perGuest: 0.018, demand: 0.28, kind: "beverage" },
+  { id: "milk", label: "Süt ve krema", keywords: ["sut", "krema", "laktozsuz sut", "yulaf sutu", "badem sutu"], unit: "lt", perGuest: 0.08, demand: 0.34, kind: "beverage" },
+  { id: "syrup", label: "Kahve şurubu / tatlandırıcı", keywords: ["surup", "sicak cikolata", "kakao", "chai", "matcha", "cikolata sos", "karamel sos", "beyaz cikolata sos"], unit: "kg", perGuest: 0.025, demand: 0.24, kind: "food" },
+  { id: "burger-bun", label: "Burger ekmeği", keywords: ["burger ekmegi", "brioche", "mini burger"], unit: "adet", perGuest: 1, demand: 0.36, kind: "food" },
+  { id: "bread", label: "Ekmek / unlu servis", keywords: ["ekmek", "simit", "pogaca", "kruvasan", "sandvic ekmegi", "tost ekmegi", "tortilla", "lavas"], unit: "adet", perGuest: 1, demand: 0.32, kind: "food" },
+  { id: "burger-patty", label: "Burger köftesi", keywords: ["burger koftesi", "hamburger koftesi"], unit: "kg", perGuest: 0.16, demand: 0.36, kind: "food" },
+  { id: "vegan-patty", label: "Vegan burger köftesi", keywords: ["vegan burger"], unit: "adet", perGuest: 1, demand: 0.08, kind: "food" },
+  { id: "beef", label: "Kırmızı et ana protein", keywords: ["dana", "antrikot", "bonfile", "kontrfile", "tranc", "nuar", "kusbasi", "kiyma", "kaburga", "fajita dana"], unit: "kg", perGuest: 0.18, demand: 0.32, kind: "food" },
+  { id: "chicken", label: "Tavuk ana protein", keywords: ["tavuk", "nugget", "schnitzel", "fajita tavuk"], unit: "kg", perGuest: 0.17, demand: 0.34, kind: "food" },
+  { id: "seafood", label: "Balık / deniz ürünü", keywords: ["balik", "somon", "levrek", "cupra", "karides", "kalamar", "ton baligi"], unit: "kg", perGuest: 0.16, demand: 0.18, kind: "food" },
+  { id: "pasta", label: "Makarna / noodle", keywords: ["makarna", "penne", "spaghetti", "fettuccine", "noodle", "mac and cheese"], unit: "kg", perGuest: 0.09, demand: 0.34, kind: "food" },
+  { id: "rice-bulgur", label: "Pirinç / bulgur", keywords: ["pirinc", "baldo", "bulgur"], unit: "kg", perGuest: 0.07, demand: 0.42, kind: "food" },
+  { id: "potato", label: "Patates garnitür", keywords: ["dondurulmus patates", "patates kizartmasi", "elma dilim patates", "kajun baharatli patates", "tatli patates", "patates"], unit: "kg", perGuest: 0.16, demand: 0.48, kind: "food" },
+  { id: "vegetable", label: "Sebze / salata hazırlık", keywords: ["domates", "salatalik", "biber", "sogan", "marul", "roka", "maydanoz", "dereotu", "nane", "limon", "portakal", "mantar", "kabak", "patlican", "havuç", "havuc", "misir"], unit: "kg", perGuest: 0.09, demand: 0.46, kind: "food" },
+  { id: "cheese-deli", label: "Peynir / şarküteri", keywords: ["kasar", "peynir", "cheddar", "mozzarella", "parmesan", "hindi fume", "salam", "sucuk"], unit: "kg", perGuest: 0.045, demand: 0.34, kind: "food" },
+  { id: "sauce-portion", label: "Porsiyon sos", keywords: ["ketcap kucuk", "mayonez kucuk", "hardal kucuk"], unit: "adet", perGuest: 1, demand: 0.3, kind: "food" },
+  { id: "sauce-bulk", label: "Sos / çeşni", keywords: ["burger sos", "makarna sosu", "barbeku", "ranch", "acili sos", "salsa", "hardal", "ketcap", "mayonez", "pesto", "soya sos", "teriyaki"], unit: "kg", perGuest: 0.035, demand: 0.42, kind: "food" },
+  { id: "breakfast-portion", label: "Porsiyon kahvaltılık", keywords: ["tereyagi porsiyon", "recel porsiyon", "bal porsiyon", "nutella porsiyon"], unit: "adet", perGuest: 1, demand: 0.22, kind: "food" },
+  { id: "oil", label: "Yağ kullanımı", keywords: ["zeytinyagi", "aycicek yagi", "kizartma yagi", "tereyagi"], unit: "lt", perGuest: 0.018, demand: 0.72, kind: "food" },
+  { id: "sugar-stick", label: "Stick şeker / tatlandırıcı", keywords: ["stick seker", "esmer seker stick", "tatlandirici stick"], unit: "adet", perGuest: 1, demand: 0.28, kind: "service" },
+  { id: "flour-sugar", label: "Un / şeker / temel kuru gıda", keywords: ["un", "seker", "toz seker", "esmer seker", "misir gevregi"], unit: "kg", perGuest: 0.035, demand: 0.28, kind: "food" },
+  { id: "spice", label: "Tuz / baharat", keywords: ["tuz", "karabiber", "pul biber", "kimyon", "kekik", "tarçın", "tarcin", "baharat", "bulyon"], unit: "kg", perGuest: 0.006, demand: 0.6, kind: "food" },
+  { id: "dessert-piece", label: "Tatlı / paket atıştırmalık", keywords: ["dondurma", "cips", "kraker", "biskuvi", "gofret", "cikolata bar", "cikolata", "protein bar", "granola", "kek", "muffin", "jelibon", "lolipop", "sakiz", "nane sekeri", "sandvic paketli", "instant noodle", "corba hazir"], unit: "adet", perGuest: 1, demand: 0.25, kind: "food" },
+  { id: "nuts", label: "Kuruyemiş / kuru meyve", keywords: ["kuruyemis", "findik", "badem", "kaju", "fistik", "cekirdegi", "kuru meyve"], unit: "kg", perGuest: 0.055, demand: 0.22, kind: "food" },
+  { id: "fruit-puree", label: "Meyve / püre", keywords: ["cilek puresi", "mango puresi", "seftali puresi", "meyve"], unit: "kg", perGuest: 0.06, demand: 0.2, kind: "food" },
+];
+
 const professionalCleaningCatalog = [
   ["Çok Amaçlı Temizleyici", "temizlik", "lt", 48, 16],
   ["Yüzey Temizleyici Konsantre", "temizlik", "lt", 36, 12],
@@ -978,6 +1056,15 @@ const defaultMailSettings = {
   },
 };
 
+const defaultPortionSettings = {
+  date: todayKey(),
+  people: 120,
+  profileId: "hotel-buffet",
+  departmentId: "all-food",
+  bufferPercent: portionProfiles["hotel-buffet"].defaultBuffer,
+  note: "",
+};
+
 const state = {
   user: null,
   view: "sayim",
@@ -990,6 +1077,7 @@ const state = {
   products: load("hotel-stock-products", seedProducts),
   counts: load("hotel-stock-counts", {}),
   mailSettings: normalizeMailSettings(load("hotel-stock-mail-settings", defaultMailSettings)),
+  portionSettings: normalizePortionSettings(load("hotel-portion-settings", defaultPortionSettings)),
   mailStatus: null,
 };
 
@@ -1434,6 +1522,23 @@ function normalizeMailSettings(settings) {
   };
 }
 
+function normalizePortionSettings(settings = {}) {
+  const profileId = portionProfiles[settings.profileId] ? settings.profileId : defaultPortionSettings.profileId;
+  const allowedDepartments = ["all-food", ...foodDepartmentIds];
+  const departmentId = allowedDepartments.includes(settings.departmentId) ? settings.departmentId : "all-food";
+  const people = Math.max(1, Math.min(20000, Number(settings.people || defaultPortionSettings.people)));
+  const defaultBuffer = portionProfiles[profileId]?.defaultBuffer ?? defaultPortionSettings.bufferPercent;
+  const bufferPercent = Math.max(0, Math.min(40, Number(settings.bufferPercent ?? defaultBuffer)));
+  return {
+    date: settings.date || todayKey(),
+    people,
+    profileId,
+    departmentId,
+    bufferPercent,
+    note: String(settings.note || "").slice(0, 1500),
+  };
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1534,6 +1639,7 @@ function render() {
           ${state.user.role === "admin" ? navButton("dashboard", "Kontrol Paneli") : ""}
           ${navButton("sayim", "Günlük Sayım")}
           ${navButton("rapor", "Günlük Rapor")}
+          ${state.user.role === "admin" ? navButton("porsiyon", "Porsiyon Analizi") : ""}
           ${state.user.role === "admin" ? navButton("urunler", "Ürünler") : ""}
           ${state.user.role === "admin" ? navButton("ayarlar", "Mail Ayarları") : ""}
           ${state.user.role === "admin" ? navButton("kullanicilar", "Kullanıcılar") : ""}
@@ -1618,6 +1724,7 @@ function viewTitle() {
     sayim: "Bugünkü stok sayım ekranı",
     dashboard: "Otel operasyon kontrol paneli",
     rapor: "Günlük rapor ve mail özeti",
+    porsiyon: "Kişi sayısına göre porsiyon analizi",
     urunler: "Ürün ve minimum stok yönetimi",
     ayarlar: "Otomatik mail ayarları",
     kullanicilar: "Kullanıcı ve departman listesi",
@@ -1627,7 +1734,8 @@ function viewTitle() {
 
 function renderView() {
   if (state.view === "dashboard") return renderDashboard();
-  if (state.view === "rapor") return renderReport();
+  if (state.view === "rapor") return renderExecutiveReport();
+  if (state.view === "porsiyon") return renderPortionAnalysis();
   if (state.view === "urunler") return renderProductsAdmin();
   if (state.view === "ayarlar") return renderMailSettings();
   if (state.view === "kullanicilar") return renderUsers();
@@ -1887,6 +1995,540 @@ function renderReportActionPanel() {
   `;
 }
 
+function renderExecutiveReport() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  return `
+    ${renderReportToolbar()}
+    ${renderReportActionPanel()}
+    ${renderReportExecutiveSummary(snapshot)}
+    ${renderReportIssueSection("critical", snapshot)}
+    ${renderReportIssueSection("manual", snapshot)}
+    <section class="panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Kurumsal mail ön izlemesi</h3>
+        <span class="badge">${escapeHtml(state.mailSettings.report.sendTime)} yönetici raporu</span>
+      </div>
+      <div class="mail-preview executive-mail-preview">${escapeHtml(buildMailReport())}</div>
+    </section>
+  `;
+}
+
+function renderReportToolbar() {
+  return `
+    <section class="panel report-filter-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Stok aksiyon raporu</h3>
+          <span class="hint">Rapor yalnızca kritik stok seviyesi ve manuel sipariş taleplerini içerir.</span>
+        </div>
+        <div class="toolbar">
+          ${renderDepartmentFilter()}
+          <input class="field" type="date" value="${state.reportDate}" data-action="report-date" />
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function reportAffectedDepartmentCount(snapshot) {
+  const ids = new Set([
+    ...snapshot.criticalItems.map((item) => item.product.departmentId),
+    ...snapshot.manualRequests.map((item) => item.product.departmentId),
+  ]);
+  return ids.size;
+}
+
+function renderReportExecutiveSummary(snapshot) {
+  return `
+    <section class="panel executive-report-summary">
+      <div class="executive-report-brand">
+        <div>
+          <p class="eyebrow">Otel Yönetim Holding Standardı</p>
+          <h3>Stok ve satın alma aksiyon raporu</h3>
+          <span>${escapeHtml(reportScopeLabel())} · ${escapeHtml(state.reportDate)}</span>
+        </div>
+        <span class="badge ok">Kurumsal format</span>
+      </div>
+      <div class="executive-summary-grid">
+        <div><strong>${snapshot.criticalItems.length}</strong><span>Kritik stok kalemi</span></div>
+        <div><strong>${snapshot.manualRequests.length}</strong><span>Manuel sipariş talebi</span></div>
+        <div><strong>${snapshot.orderNeededItems.length}</strong><span>Toplam aksiyon</span></div>
+        <div><strong>${reportAffectedDepartmentCount(snapshot)}</strong><span>Etkilenen departman</span></div>
+      </div>
+    </section>
+  `;
+}
+
+function reportIssueRows(snapshot, type) {
+  const items = type === "critical" ? snapshot.criticalItems : snapshot.manualRequests;
+  return items.map(({ product, count, qty }) => {
+    const request = count?.orderRequest || {};
+    const shortage = Math.max(Number(product.minQty) - Number(qty), 0);
+    const requestQty = request.qty ? `${formatReportNumber(request.qty)} ${product.unit}` : "";
+    const suggestedQty = shortage > 0 ? `${formatReportNumber(shortage)} ${product.unit}` : "Satın alma onayı";
+    return {
+      department: departmentStockTitle(departments.find((department) => department.id === product.departmentId) || { id: product.departmentId, name: departmentName(product.departmentId) }),
+      product: product.name,
+      unit: product.unit,
+      current: `${formatReportNumber(qty)} ${product.unit}`,
+      minimum: `${formatReportNumber(product.minQty)} ${product.unit}`,
+      actionQty: type === "critical" ? suggestedQty : requestQty || "Miktar belirtilmedi",
+      reason: type === "critical" ? (count?.note || "Minimum stok seviyesinin altında") : (request.reason || count?.note || "Manuel satın alma talebi"),
+      savedBy: count?.user || "Sistem",
+      savedAt: count?.time || "",
+    };
+  });
+}
+
+function renderReportIssueSection(type, snapshot) {
+  const isCritical = type === "critical";
+  const rows = reportIssueRows(snapshot, type);
+  const title = isCritical ? "Kritik stok seviyesine düşen ürünler" : "Stok yeterli olsa da talep edilen ürünler";
+  const subtitle = isCritical
+    ? "Minimum stok altına inen kalemler satın alma önceliğiyle listelenir."
+    : "Departmanların ayrıca sipariş edilmesini istediği kalemler ayrı tutulur.";
+  const qtyTitle = isCritical ? "Önerilen sipariş" : "Talep miktarı";
+  const body = rows.map((row) => `
+    <tr>
+      <td data-label="Departman">${escapeHtml(row.department)}</td>
+      <td data-label="Ürün"><strong>${escapeHtml(row.product)}</strong></td>
+      <td data-label="Mevcut">${escapeHtml(row.current)}</td>
+      <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
+      <td data-label="${qtyTitle}">${escapeHtml(row.actionQty)}</td>
+      <td data-label="Açıklama">${escapeHtml(row.reason)}</td>
+      <td data-label="Kaydeden">${escapeHtml(row.savedBy)}${row.savedAt ? `<br><span class="hint">${escapeHtml(row.savedAt)}</span>` : ""}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <section class="panel report-issue-panel ${isCritical ? "critical-report-panel" : "manual-report-panel"}">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">${title}</h3>
+          <span class="hint">${subtitle}</span>
+        </div>
+        <span class="badge ${rows.length ? "danger" : "ok"}">${rows.length} kalem</span>
+      </div>
+      <div class="table-wrap report-action-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Departman</th>
+              <th>Ürün</th>
+              <th>Mevcut</th>
+              <th>Minimum</th>
+              <th>${qtyTitle}</th>
+              <th>Açıklama</th>
+              <th>Kaydeden</th>
+            </tr>
+          </thead>
+          <tbody>${body || `<tr><td data-label="Durum" colspan="7" class="empty">Bu bölümde raporlanacak ürün yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function foldText(value) {
+  const replacements = {
+    ç: "c", Ç: "c",
+    ğ: "g", Ğ: "g",
+    ı: "i", İ: "i",
+    ö: "o", Ö: "o",
+    ş: "s", Ş: "s",
+    ü: "u", Ü: "u",
+  };
+  return String(value || "")
+    .replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => replacements[char] || char)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function portionDepartmentLabel(id) {
+  if (id === "all-food") return "Tüm gıda operasyonu";
+  return departmentStockTitle(departments.find((department) => department.id === id) || { id, name: departmentName(id) });
+}
+
+function portionDepartmentOptions(selectedId = state.portionSettings.departmentId) {
+  return [
+    `<option value="all-food" ${selectedId === "all-food" ? "selected" : ""}>Tüm gıda operasyonu</option>`,
+    ...foodDepartmentIds.map((id) => `<option value="${id}" ${selectedId === id ? "selected" : ""}>${escapeHtml(portionDepartmentLabel(id))}</option>`),
+  ].join("");
+}
+
+function portionProfileOptions(selectedId = state.portionSettings.profileId) {
+  return Object.entries(portionProfiles)
+    .map(([id, profile]) => `<option value="${id}" ${selectedId === id ? "selected" : ""}>${escapeHtml(profile.label)}</option>`)
+    .join("");
+}
+
+function matchPortionRule(product) {
+  const name = foldText(product.name);
+  return portionRules.find((rule) => rule.keywords.some((keyword) => name.includes(foldText(keyword)))) || null;
+}
+
+function portionPackageKgEstimate(product) {
+  const name = foldText(product.name);
+  if (name.includes("makarna") || name.includes("noodle")) return 0.5;
+  if (name.includes("pirinc") || name.includes("bulgur") || name.includes("un") || name.includes("seker") || name.includes("misir gevregi")) return 1;
+  if (name.includes("baharat") || name.includes("tuz") || name.includes("tarcin")) return 0.5;
+  if (name.includes("marshmallow") || name.includes("patlamis misir")) return 0.25;
+  return null;
+}
+
+function portionPackagePieceEstimate(product) {
+  const name = foldText(product.name);
+  if (name.includes("pipet") || name.includes("karistirici")) return 100;
+  if (name.includes("pecete") || name.includes("islak mendil")) return 100;
+  if (name.includes("catal") || name.includes("kasik") || name.includes("bicak")) return 100;
+  if (name.includes("stick")) return 500;
+  return null;
+}
+
+function portionPieceKgEstimate(product) {
+  const name = foldText(product.name);
+  const kgMatch = name.match(/(\d+(?:[\.,]\d+)?)\s*kg/);
+  if (kgMatch) return Number(kgMatch[1].replace(",", "."));
+  if (name.includes("ton baligi")) return 0.16;
+  if (name.includes("misir konservesi")) return 0.22;
+  return null;
+}
+
+function portionPieceLiterEstimate(product) {
+  const name = foldText(product.name);
+  const literMatch = name.match(/(\d+(?:[\.,]\d+)?)\s*lt/);
+  if (literMatch) return Number(literMatch[1].replace(",", "."));
+  const mlMatch = name.match(/(\d{2,4})\s*ml/);
+  if (mlMatch) return Number(mlMatch[1]) / 1000;
+  if (name.includes("yag") && name.includes("1")) return 1;
+  return null;
+}
+
+function convertPortionRequirement(requiredBase, rule, product) {
+  const productUnit = foldText(product.unit);
+  const ruleUnit = foldText(rule.unit);
+  if (productUnit === ruleUnit) {
+    return { amount: requiredBase, unit: product.unit, confidence: "high", note: "" };
+  }
+  if (ruleUnit === "kg" && productUnit === "gr") {
+    return { amount: requiredBase * 1000, unit: product.unit, confidence: "high", note: "" };
+  }
+  if (ruleUnit === "kg" && productUnit === "paket") {
+    const kgPerPackage = portionPackageKgEstimate(product);
+    if (kgPerPackage) return { amount: requiredBase / kgPerPackage, unit: product.unit, confidence: "medium", note: `1 paket yaklaşık ${kgPerPackage} kg kabul edildi.` };
+  }
+  if (ruleUnit === "kg" && productUnit === "adet") {
+    const kgPerPiece = portionPieceKgEstimate(product);
+    if (kgPerPiece) return { amount: requiredBase / kgPerPiece, unit: product.unit, confidence: "medium", note: `1 adet yaklaşık ${kgPerPiece} kg kabul edildi.` };
+  }
+  if (ruleUnit === "lt" && productUnit === "adet") {
+    const literPerPiece = portionPieceLiterEstimate(product);
+    if (literPerPiece) return { amount: requiredBase / literPerPiece, unit: product.unit, confidence: "medium", note: `1 adet yaklaşık ${literPerPiece} lt kabul edildi.` };
+  }
+  if (ruleUnit === "adet" && (productUnit === "paket" || productUnit === "kutu")) {
+    const piecePerPackage = portionPackagePieceEstimate(product);
+    if (piecePerPackage) return { amount: requiredBase / piecePerPackage, unit: product.unit, confidence: "medium", note: `1 ${product.unit} yaklaşık ${piecePerPackage} adet kabul edildi.` };
+  }
+  return {
+    amount: requiredBase,
+    unit: rule.unit,
+    confidence: "review",
+    note: `Ürün birimi "${product.unit}", hesap birimi "${rule.unit}". Satın alma öncesi birim dönüşümü kontrol edilmeli.`,
+  };
+}
+
+function profileFactorForRule(profile, rule) {
+  if (rule.kind === "beverage") return profile.beverageMultiplier;
+  if (rule.kind === "service") return profile.serviceMultiplier;
+  return profile.multiplier;
+}
+
+function buildPortionProductAnalysis(product, settings, profile) {
+  const rule = matchPortionRule(product);
+  if (!rule) return null;
+
+  const count = getCount(product.id, settings.date);
+  const available = count ? Number(count.qty) : Number(product.lastQty);
+  const profileFactor = profileFactorForRule(profile, rule);
+  const baseRequirement = settings.people * rule.perGuest * rule.demand * profileFactor;
+  const requiredBase = baseRequirement * (1 + settings.bufferPercent / 100);
+  const conversion = convertPortionRequirement(requiredBase, rule, product);
+  const required = Number(conversion.amount);
+  const shortage = conversion.confidence === "review" ? 0 : Math.max(required - available, 0);
+  const coverage = required > 0 ? Math.round((available / required) * 100) : 100;
+  const needsReserveReview = conversion.confidence !== "review" && shortage <= 0 && available < required * 1.18;
+  const needsFreshCountReview = !count && conversion.confidence !== "review" && shortage <= 0 && available < required * 1.35;
+
+  let status = "ok";
+  let statusLabel = "Yeterli";
+  let opinion = "Stok kişi sayısı ve emniyet payına göre yeterli görünüyor.";
+
+  if (conversion.confidence === "review") {
+    status = "review";
+    statusLabel = "Birim görüşü";
+    opinion = conversion.note;
+  } else if (shortage > 0) {
+    status = "shortage";
+    statusLabel = "Sipariş gerekir";
+    opinion = `${formatReportNumber(shortage)} ${product.unit} ek sipariş önerilir.`;
+  } else if (needsReserveReview || needsFreshCountReview || conversion.confidence === "medium") {
+    status = "review";
+    statusLabel = needsFreshCountReview ? "Sayım teyidi" : "Şef görüşü";
+    opinion = needsFreshCountReview
+      ? "Bugünkü sayım yok; analiz son stok üzerinden yapıldı. Servis öncesi depo teyidi önerilir."
+      : conversion.note || "Stok yeterli ama emniyet payı dar. Menü yoğunluğu ve kişi profili şef tarafından onaylanmalı.";
+  }
+
+  return {
+    product,
+    rule,
+    count,
+    available,
+    required,
+    shortage,
+    coverage,
+    status,
+    statusLabel,
+    opinion,
+    source: count ? "Bugünkü sayım" : "Son kayıtlı stok",
+    requirementUnit: conversion.unit,
+    confidence: conversion.confidence,
+    baseRequirement,
+  };
+}
+
+function buildPortionAnalysisSnapshot(settings = state.portionSettings) {
+  const normalized = normalizePortionSettings(settings);
+  const profile = portionProfiles[normalized.profileId] || portionProfiles["hotel-buffet"];
+  const departmentIds = normalized.departmentId === "all-food" ? foodDepartmentIds : [normalized.departmentId];
+  const products = state.products
+    .filter((product) => product.active && departmentIds.includes(product.departmentId));
+  const rows = products
+    .map((product) => buildPortionProductAnalysis(product, normalized, profile))
+    .filter(Boolean);
+  const shortageRows = rows
+    .filter((row) => row.status === "shortage")
+    .sort((a, b) => (b.shortage / Math.max(b.required, 1)) - (a.shortage / Math.max(a.required, 1)));
+  const reviewRows = rows
+    .filter((row) => row.status === "review")
+    .sort((a, b) => a.coverage - b.coverage);
+  const okRows = rows
+    .filter((row) => row.status === "ok")
+    .sort((a, b) => a.coverage - b.coverage);
+  const unmappedProducts = products
+    .filter((product) => !matchPortionRule(product))
+    .slice(0, 24);
+
+  return {
+    settings: normalized,
+    profile,
+    products,
+    rows,
+    shortageRows,
+    reviewRows,
+    okRows,
+    unmappedProducts,
+  };
+}
+
+function portionRowCells(row, includeOpinion = true) {
+  const department = portionDepartmentLabel(row.product.departmentId);
+  const shortageText = row.shortage > 0 ? `${formatReportNumber(row.shortage)} ${row.product.unit}` : "-";
+  return `
+    <td data-label="Departman">${escapeHtml(department)}</td>
+    <td data-label="Ürün"><strong>${escapeHtml(row.product.name)}</strong><br><span class="hint">${escapeHtml(row.rule.label)}</span></td>
+    <td data-label="Mevcut">${escapeHtml(formatReportNumber(row.available))} ${escapeHtml(row.product.unit)}<br><span class="hint">${escapeHtml(row.source)}</span></td>
+    <td data-label="İhtiyaç">${escapeHtml(formatReportNumber(row.required))} ${escapeHtml(row.requirementUnit)}<br><span class="hint">%${row.coverage} karşılama</span></td>
+    <td data-label="Açık">${escapeHtml(shortageText)}</td>
+    ${includeOpinion ? `<td data-label="Görüş">${escapeHtml(row.opinion)}</td>` : ""}
+  `;
+}
+
+function renderPortionAnalysis() {
+  const snapshot = buildPortionAnalysisSnapshot();
+  return `
+    ${renderPortionControlPanel(snapshot)}
+    ${renderPortionSummary(snapshot)}
+    ${renderPortionActionPanel(snapshot)}
+    ${renderPortionIssueSection("shortage", snapshot)}
+    ${renderPortionIssueSection("review", snapshot)}
+    ${renderPortionReferencePanel(snapshot)}
+  `;
+}
+
+function renderPortionControlPanel(snapshot) {
+  const { settings, profile } = snapshot;
+  return `
+    <section class="panel portion-control-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Kişi sayısına göre üretim kontrolü</h3>
+          <span class="hint">${escapeHtml(profile.description)}</span>
+        </div>
+        <span class="badge ok">Gıda operasyonu</span>
+      </div>
+      <form class="portion-control-grid" data-action="portion-form">
+        <label>
+          <span>Kişi sayısı</span>
+          <input class="field" name="people" type="number" min="1" max="20000" step="1" required value="${escapeHtml(settings.people)}" />
+        </label>
+        <label>
+          <span>Servis tipi</span>
+          <select class="field" name="profileId">${portionProfileOptions(settings.profileId)}</select>
+        </label>
+        <label>
+          <span>Departman</span>
+          <select class="field" name="departmentId">${portionDepartmentOptions(settings.departmentId)}</select>
+        </label>
+        <label>
+          <span>Tarih</span>
+          <input class="field" name="date" type="date" value="${escapeHtml(settings.date)}" />
+        </label>
+        <label>
+          <span>Fire / emniyet payı (%)</span>
+          <input class="field" name="bufferPercent" type="number" min="0" max="40" step="1" value="${escapeHtml(settings.bufferPercent)}" />
+        </label>
+        <button class="btn" type="submit">Analizi hesapla</button>
+      </form>
+    </section>
+  `;
+}
+
+function portionRiskLabel(snapshot) {
+  if (snapshot.shortageRows.length > 0) return { text: "Satın alma aksiyonu var", cls: "danger" };
+  if (snapshot.reviewRows.length > 0) return { text: "Şef görüşü gerekli", cls: "warn" };
+  return { text: "Stok güvenli", cls: "ok" };
+}
+
+function renderPortionSummary(snapshot) {
+  const risk = portionRiskLabel(snapshot);
+  return `
+    <section class="panel portion-summary-panel">
+      <div class="portion-summary-head">
+        <div>
+          <p class="eyebrow">Operasyon görüş raporu</p>
+          <h3>${escapeHtml(snapshot.settings.people)} kişi için stok yeterlilik analizi</h3>
+          <span>${escapeHtml(portionDepartmentLabel(snapshot.settings.departmentId))} · ${escapeHtml(snapshot.settings.date)} · ${escapeHtml(snapshot.profile.label)}</span>
+        </div>
+        <span class="badge ${risk.cls}">${escapeHtml(risk.text)}</span>
+      </div>
+      <div class="portion-summary-grid">
+        <div><strong>${snapshot.rows.length}</strong><span>Hesaplanan kalem</span></div>
+        <div><strong>${snapshot.shortageRows.length}</strong><span>Sipariş gereken</span></div>
+        <div><strong>${snapshot.reviewRows.length}</strong><span>Görüş isteyen</span></div>
+        <div><strong>${snapshot.settings.bufferPercent}%</strong><span>Emniyet payı</span></div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPortionActionPanel(snapshot) {
+  return `
+    <section class="panel portion-actions-panel">
+      <div class="panel-head">
+        <h3 class="panel-title">Porsiyon raporu çıktı merkezi</h3>
+        <span class="badge">${escapeHtml(snapshot.settings.people)} kişi</span>
+      </div>
+      <div class="report-action-grid">
+        <button class="btn" data-action="download-portion-pdf">Porsiyon PDF indir</button>
+        <button class="btn" data-action="download-portion-excel">Porsiyon Excel indir</button>
+        <button class="btn secondary" data-action="share-portion-pdf">WhatsApp PDF</button>
+        <button class="btn secondary" data-action="share-portion-whatsapp">WhatsApp özeti</button>
+        <button class="btn secondary" data-action="copy-portion-report">Rapor metnini kopyala</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderPortionIssueSection(type, snapshot) {
+  const isShortage = type === "shortage";
+  const rows = isShortage ? snapshot.shortageRows : snapshot.reviewRows;
+  const title = isShortage ? "Sipariş edilmesi gereken gıda ve servis kalemleri" : "Şef / yönetici görüşü gereken kalemler";
+  const subtitle = isShortage
+    ? "Kişi sayısı ve emniyet payına göre mevcut stok ihtiyacı karşılamıyor."
+    : "Stok teknik olarak yetebilir; ancak sayım, birim dönüşümü veya dar emniyet payı nedeniyle görüş istenir.";
+  const badgeClass = rows.length ? (isShortage ? "danger" : "warn") : "ok";
+  const body = rows.map((row) => `<tr>${portionRowCells(row)}</tr>`).join("");
+  return `
+    <section class="panel portion-issue-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">${title}</h3>
+          <span class="hint">${subtitle}</span>
+        </div>
+        <span class="badge ${badgeClass}">${rows.length} kalem</span>
+      </div>
+      <div class="table-wrap portion-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Departman</th>
+              <th>Ürün</th>
+              <th>Mevcut</th>
+              <th>İhtiyaç</th>
+              <th>Açık</th>
+              <th>Görüş</th>
+            </tr>
+          </thead>
+          <tbody>${body || `<tr><td data-label="Durum" colspan="6" class="empty">Bu bölümde aksiyon gerektiren ürün yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderPortionReferencePanel(snapshot) {
+  const okPreview = snapshot.okRows.slice(0, 8).map((row) => `
+    <tr>
+      ${portionRowCells(row, false)}
+      <td data-label="Durum"><span class="badge ok">Yeterli</span></td>
+    </tr>
+  `).join("");
+  const unmapped = snapshot.unmappedProducts.map((product) => `<span>${escapeHtml(product.name)}</span>`).join("");
+  return `
+    <section class="panel portion-reference-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Hesap yöntemi ve yönetici notu</h3>
+          <span class="hint">Formül: kişi sayısı × porsiyon gramajı/adedi × satış payı × servis tipi × emniyet payı.</span>
+        </div>
+        <span class="badge">Kurumsal reçete kontrolü</span>
+      </div>
+      <div class="portion-reference-grid">
+        <div class="portion-method-box">
+          <strong>Kabul edilen operasyon standardı</strong>
+          <span>Protein, nişasta, sebze/salata, içecek ve tek kullanımlık servis kalemleri ayrı hesaplanır. Birim dönüşümü net olmayan stoklarda sistem otomatik olarak “görüş gerekir” uyarısı verir.</span>
+          <span>USDA Food Buying Guide mantığına uygun olarak hesap satın alma birimine çevrilir; otel büfesi için fire/emniyet payı ayrıca eklenir.</span>
+        </div>
+        <form class="portion-note-box" data-action="portion-note-form">
+          <label>
+            <span>Şef / yönetici görüş notu</span>
+            <textarea name="note" placeholder="Menü yoğunluğu, özel grup, çocuk oranı, geç servis veya tedarikçi notu...">${escapeHtml(snapshot.settings.note)}</textarea>
+          </label>
+          <button class="btn secondary" type="submit">Görüş notunu kaydet</button>
+        </form>
+      </div>
+      <div class="table-wrap portion-table compact">
+        <table>
+          <thead>
+            <tr>
+              <th>Departman</th>
+              <th>Ürün</th>
+              <th>Mevcut</th>
+              <th>İhtiyaç</th>
+              <th>Açık</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>${okPreview || `<tr><td data-label="Durum" colspan="6" class="empty">Yeterli görünen ürün yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+      ${unmapped ? `<div class="portion-unmapped"><strong>Analiz dışı bırakılan destek kalemleri:</strong>${unmapped}</div>` : ""}
+    </section>
+  `;
+}
+
 function renderDetailedReportTable(date = state.reportDate) {
   const rows = reportProductRows(date)
     .map((row) => `
@@ -1993,7 +2635,52 @@ function buildDailyReportSnapshot(date = state.reportDate, departmentId = state.
   };
 }
 
+function appendExecutiveMailSection(lines, title, rows, emptyText) {
+  lines.push("");
+  lines.push(title);
+  lines.push("-".repeat(title.length));
+  if (rows.length === 0) {
+    lines.push(emptyText);
+    return;
+  }
+
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${row.department} / ${row.product}`);
+    lines.push(`   Mevcut: ${row.current} | Minimum: ${row.minimum} | Aksiyon: ${row.actionQty}`);
+    lines.push(`   Açıklama: ${row.reason}`);
+    if (row.savedBy || row.savedAt) lines.push(`   Kaydeden: ${row.savedBy}${row.savedAt ? ` - ${row.savedAt}` : ""}`);
+  });
+}
+
+function buildExecutiveMailReport() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const criticalRows = reportIssueRows(snapshot, "critical");
+  const manualRows = reportIssueRows(snapshot, "manual");
+  const lines = [
+    "OTEL YÖNETİM STOK VE SATIN ALMA AKSİYON RAPORU",
+    `Tarih: ${snapshot.date}`,
+    `Kapsam: ${reportScopeLabel()}`,
+    `Oluşturan: ${state.user?.name || ""}`,
+    `Alıcılar: ${state.mailSettings.report.recipients}`,
+    "",
+    "Yönetici Özeti",
+    "--------------",
+    `Kritik stok kalemi: ${criticalRows.length}`,
+    `Manuel sipariş talebi: ${manualRows.length}`,
+    `Toplam satın alma aksiyonu: ${snapshot.orderNeededItems.length}`,
+    `Etkilenen departman: ${reportAffectedDepartmentCount(snapshot)}`,
+  ];
+
+  appendExecutiveMailSection(lines, "1. KRİTİK STOK SEVİYESİNE DÜŞEN ÜRÜNLER", criticalRows, "Kritik stok seviyesine düşen ürün yok.");
+  appendExecutiveMailSection(lines, "2. STOK YETERLİ OLSA DA TALEP EDİLEN ÜRÜNLER", manualRows, "Manuel sipariş talebi yok.");
+
+  lines.push("");
+  lines.push("Not: Rapor yalnızca satın alma aksiyonu gerektiren kalemleri içerir. Normal stok kalemleri sistemde saklanır, bu rapora dahil edilmez.");
+  return lines.join("\n");
+}
+
 function buildMailReport() {
+  return buildExecutiveMailReport();
   const snapshot = buildDailyReportSnapshot();
   const lines = [
     state.mailSettings.report.subject,
@@ -2103,6 +2790,166 @@ function reportFileStem(extension = "") {
   return `stok-raporu-${state.reportDate}-${scope}${extension}`;
 }
 
+function portionFileStem(extension = "") {
+  const scope = portionDepartmentLabel(state.portionSettings.departmentId)
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "") || "porsiyon";
+  return `porsiyon-analizi-${state.portionSettings.date}-${state.portionSettings.people}-kisi-${scope}${extension}`;
+}
+
+function appendPortionTextSection(lines, title, rows, emptyText) {
+  lines.push("", title, "-".repeat(title.length));
+  if (!rows.length) {
+    lines.push(emptyText);
+    return;
+  }
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${portionDepartmentLabel(row.product.departmentId)} / ${row.product.name}`);
+    lines.push(`   Mevcut: ${formatReportNumber(row.available)} ${row.product.unit} | Ihtiyac: ${formatReportNumber(row.required)} ${row.requirementUnit} | Acik: ${row.shortage > 0 ? `${formatReportNumber(row.shortage)} ${row.product.unit}` : "-"}`);
+    lines.push(`   Gorus: ${row.opinion}`);
+  });
+}
+
+function buildPortionReportText() {
+  const snapshot = buildPortionAnalysisSnapshot();
+  const risk = portionRiskLabel(snapshot);
+  const lines = [
+    "OTEL YONETIM PORSIYON VE STOK YETERLILIK RAPORU",
+    `Tarih: ${snapshot.settings.date}`,
+    `Kapsam: ${portionDepartmentLabel(snapshot.settings.departmentId)}`,
+    `Kisi sayisi: ${snapshot.settings.people}`,
+    `Servis tipi: ${snapshot.profile.label}`,
+    `Emniyet payi: %${snapshot.settings.bufferPercent}`,
+    `Durum: ${risk.text}`,
+    "",
+    `Hesaplanan kalem: ${snapshot.rows.length}`,
+    `Siparis gereken: ${snapshot.shortageRows.length}`,
+    `Sef / yonetici gorusu gereken: ${snapshot.reviewRows.length}`,
+  ];
+
+  appendPortionTextSection(lines, "1. SIPARIS EDILMESI GEREKEN KALEMLER", snapshot.shortageRows, "Bu kisi sayisina gore dogrudan siparis gerektiren kalem yok.");
+  appendPortionTextSection(lines, "2. SEF / YONETICI GORUSU GEREKEN KALEMLER", snapshot.reviewRows, "Gorus gerektiren kalem yok.");
+
+  if (snapshot.settings.note) {
+    lines.push("", "Yonetici notu", "------------", snapshot.settings.note);
+  }
+
+  lines.push("", "Not: Hesaplar tahmini porsiyon, satis payi ve emniyet payi ile yapilir; son karar menu kompozisyonu ve servis yogunluguna gore sef/yetkili tarafindan onaylanmalidir.");
+  return lines.join("\n");
+}
+
+function portionExcelRows(rows, emptyText) {
+  if (!rows.length) return `<tr><td colspan="9">${excelCell(emptyText)}</td></tr>`;
+  return rows.map((row) => `
+    <tr>
+      <td>${excelCell(portionDepartmentLabel(row.product.departmentId))}</td>
+      <td>${excelCell(row.product.name)}</td>
+      <td>${excelCell(row.rule.label)}</td>
+      <td>${excelCell(`${formatReportNumber(row.available)} ${row.product.unit}`)}</td>
+      <td>${excelCell(`${formatReportNumber(row.required)} ${row.requirementUnit}`)}</td>
+      <td>${excelCell(row.shortage > 0 ? `${formatReportNumber(row.shortage)} ${row.product.unit}` : "-")}</td>
+      <td>${excelCell(`%${row.coverage}`)}</td>
+      <td>${excelCell(row.statusLabel)}</td>
+      <td>${excelCell(row.opinion)}</td>
+    </tr>
+  `).join("");
+}
+
+function buildPortionExcelHtml() {
+  const snapshot = buildPortionAnalysisSnapshot();
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; color: #16211f; }
+        table { border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #cfd8d5; padding: 7px 9px; vertical-align: top; }
+        th { background: #eef4f2; color: #0f6758; }
+        h2 { color: #0f6758; }
+      </style>
+    </head>
+    <body>
+      <h2>Otel Yönetim Porsiyon ve Stok Yeterlilik Raporu</h2>
+      <p>Tarih: ${excelCell(snapshot.settings.date)} | Kapsam: ${excelCell(portionDepartmentLabel(snapshot.settings.departmentId))} | Kişi: ${snapshot.settings.people} | Servis: ${excelCell(snapshot.profile.label)} | Emniyet: %${snapshot.settings.bufferPercent}</p>
+      <table>
+        <thead><tr><th>Hesaplanan kalem</th><th>Sipariş gereken</th><th>Görüş gereken</th><th>Servis tipi</th></tr></thead>
+        <tbody><tr><td>${snapshot.rows.length}</td><td>${snapshot.shortageRows.length}</td><td>${snapshot.reviewRows.length}</td><td>${excelCell(snapshot.profile.label)}</td></tr></tbody>
+      </table>
+      <h3>Sipariş edilmesi gereken kalemler</h3>
+      <table>
+        <thead><tr><th>Departman</th><th>Ürün</th><th>Kategori</th><th>Mevcut</th><th>İhtiyaç</th><th>Açık</th><th>Karşılama</th><th>Durum</th><th>Görüş</th></tr></thead>
+        <tbody>${portionExcelRows(snapshot.shortageRows, "Sipariş gerektiren kalem yok.")}</tbody>
+      </table>
+      <h3>Şef / yönetici görüşü gereken kalemler</h3>
+      <table>
+        <thead><tr><th>Departman</th><th>Ürün</th><th>Kategori</th><th>Mevcut</th><th>İhtiyaç</th><th>Açık</th><th>Karşılama</th><th>Durum</th><th>Görüş</th></tr></thead>
+        <tbody>${portionExcelRows(snapshot.reviewRows, "Görüş gerektiren kalem yok.")}</tbody>
+      </table>
+      ${snapshot.settings.note ? `<h3>Yönetici notu</h3><p>${excelCell(snapshot.settings.note)}</p>` : ""}
+    </body>
+  </html>`;
+}
+
+function createPortionExcelFile() {
+  const blob = new Blob([`\ufeff${buildPortionExcelHtml()}`], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const name = portionFileStem(".xls");
+  try {
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    blob.name = name;
+    return blob;
+  }
+}
+
+function downloadPortionExcelReport() {
+  const file = createPortionExcelFile();
+  downloadBlob(file, file.name || portionFileStem(".xls"));
+}
+
+function buildPortionPdfLines() {
+  return buildPortionReportText().split("\n").map(toPdfText);
+}
+
+function createPortionPdfFile() {
+  const blob = buildPdfBlobFromLines(buildPortionPdfLines());
+  const name = portionFileStem(".pdf");
+  try {
+    return new File([blob], name, { type: blob.type });
+  } catch {
+    blob.name = name;
+    return blob;
+  }
+}
+
+function downloadPortionPdfReport() {
+  const file = createPortionPdfFile();
+  downloadBlob(file, file.name || portionFileStem(".pdf"));
+}
+
+async function sharePortionPdfReport() {
+  const file = createPortionPdfFile();
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    await navigator.share({
+      title: "Otel Yonetim porsiyon analizi",
+      text: buildPortionReportText(),
+      files: [file],
+    });
+    return;
+  }
+  downloadBlob(file, file.name || portionFileStem(".pdf"));
+  openWhatsAppPortionReport();
+  window.alert("Bu cihaz PDF dosyasini dogrudan paylasamadigi icin PDF indirildi. Acilan WhatsApp mesajina PDF dosyasini ekleyebilirsin.");
+}
+
+function openWhatsAppPortionReport() {
+  const text = encodeURIComponent(buildPortionReportText());
+  window.open(`https://wa.me/?text=${text}`, "_blank");
+}
+
 function reportProductRows(date = state.reportDate, departmentId = reportDepartmentId()) {
   const snapshot = buildDailyReportSnapshot(date, departmentId);
   return snapshot.productStates.map(({ product, count, qty }) => {
@@ -2130,6 +2977,30 @@ function reportProductRows(date = state.reportDate, departmentId = reportDepartm
 }
 
 function reportSummaryText() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const lines = [
+    "Otel Yönetim stok aksiyon raporu",
+    `Tarih: ${state.reportDate}`,
+    `Kapsam: ${reportScopeLabel()}`,
+    `Kritik stok: ${snapshot.criticalItems.length}`,
+    `Manuel talep: ${snapshot.manualRequests.length}`,
+  ];
+
+  if (snapshot.criticalItems.length) {
+    lines.push("", "Kritik stoklar:");
+    reportIssueRows(snapshot, "critical").slice(0, 10).forEach((row) => {
+      lines.push(`- ${row.department} / ${row.product}: ${row.current} | min ${row.minimum}`);
+    });
+  }
+
+  if (snapshot.manualRequests.length) {
+    lines.push("", "Manuel talepler:");
+    reportIssueRows(snapshot, "manual").slice(0, 10).forEach((row) => {
+      lines.push(`- ${row.department} / ${row.product}: ${row.actionQty} | ${row.reason}`);
+    });
+  }
+
+  return lines.join("\n");
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const counted = snapshot.productStates.length - snapshot.notCounted.length;
   const lines = [
@@ -2180,7 +3051,59 @@ function excelCell(value) {
   return escapeHtml(value).replace(/\n/g, "<br>");
 }
 
+function buildExcelIssueTable(title, rows, emptyText) {
+  const bodyRows = rows.length
+    ? rows.map((row) => `
+      <tr>
+        <td>${excelCell(row.department)}</td>
+        <td>${excelCell(row.product)}</td>
+        <td>${excelCell(row.current)}</td>
+        <td>${excelCell(row.minimum)}</td>
+        <td>${excelCell(row.actionQty)}</td>
+        <td>${excelCell(row.reason)}</td>
+        <td>${excelCell(row.savedBy)}</td>
+        <td>${excelCell(row.savedAt)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="8">${excelCell(emptyText)}</td></tr>`;
+
+  return `
+    <h3>${excelCell(title)}</h3>
+    <table>
+      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>Aksiyon miktarı</th><th>Açıklama</th><th>Kaydeden</th><th>Saat</th></tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  `;
+}
+
 function buildExcelHtml() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const criticalRows = reportIssueRows(snapshot, "critical");
+  const manualRows = reportIssueRows(snapshot, "manual");
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; color: #16211f; }
+        table { border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #cfd8d5; padding: 7px 9px; vertical-align: top; }
+        th { background: #eef4f2; color: #0f6758; }
+        h2 { color: #0f6758; }
+        h3 { margin-top: 22px; color: #16211f; }
+      </style>
+    </head>
+    <body>
+      <h2>Otel Yönetim Stok ve Satın Alma Aksiyon Raporu</h2>
+      <p>Tarih: ${excelCell(state.reportDate)} | Kapsam: ${excelCell(reportScopeLabel())}</p>
+      <table>
+        <thead><tr><th>Kritik stok</th><th>Manuel talep</th><th>Toplam aksiyon</th><th>Etkilenen departman</th></tr></thead>
+        <tbody><tr><td>${criticalRows.length}</td><td>${manualRows.length}</td><td>${snapshot.orderNeededItems.length}</td><td>${reportAffectedDepartmentCount(snapshot)}</td></tr></tbody>
+      </table>
+      ${buildExcelIssueTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
+      ${buildExcelIssueTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
+    </body>
+  </html>`;
   const rows = reportProductRows();
   const headers = ["Tarih", "Departman", "Urun", "Birim", "Onceki", "Minimum", "Sayim", "Durum", "Kaydeden", "Saat", "Not", "Manuel Siparis", "Talep Miktari", "Talep Gerekcesi"];
   const bodyRows = rows.map((row) => `
@@ -2276,6 +3199,45 @@ function pdfEscape(value) {
 
 function buildPdfLines() {
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const criticalRows = reportIssueRows(snapshot, "critical");
+  const manualRows = reportIssueRows(snapshot, "manual");
+  const lines = [
+    "OTEL YONETIM STOK VE SATIN ALMA AKSIYON RAPORU",
+    `Tarih: ${state.reportDate}`,
+    `Kapsam: ${reportScopeLabel()}`,
+    `Olusturan: ${state.user?.name || ""}`,
+    "",
+    `Kritik stok: ${criticalRows.length}`,
+    `Manuel talep: ${manualRows.length}`,
+    `Toplam aksiyon: ${snapshot.orderNeededItems.length}`,
+    `Etkilenen departman: ${reportAffectedDepartmentCount(snapshot)}`,
+    "",
+    "1. KRITIK STOK SEVIYESINE DUSEN URUNLER",
+  ];
+
+  if (criticalRows.length === 0) {
+    lines.push("Kritik stok seviyesine dusen urun yok.");
+  } else {
+    criticalRows.forEach((row, index) => {
+      lines.push(`${index + 1}. ${row.department} / ${row.product}`);
+      lines.push(`   Mevcut: ${row.current} | Minimum: ${row.minimum} | Aksiyon: ${row.actionQty}`);
+      lines.push(`   Aciklama: ${row.reason}`);
+    });
+  }
+
+  lines.push("", "2. STOK YETERLI OLSA DA TALEP EDILEN URUNLER");
+  if (manualRows.length === 0) {
+    lines.push("Manuel siparis talebi yok.");
+  } else {
+    manualRows.forEach((row, index) => {
+      lines.push(`${index + 1}. ${row.department} / ${row.product}`);
+      lines.push(`   Mevcut: ${row.current} | Talep: ${row.actionQty}`);
+      lines.push(`   Gerekce: ${row.reason}`);
+    });
+  }
+
+  return lines.map(toPdfText);
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const lines = [
     "OTEL YONETIM STOK RAPORU",
     `Tarih: ${state.reportDate}`,
@@ -2306,14 +3268,13 @@ function buildPdfLines() {
   return lines.map(toPdfText);
 }
 
-function buildPdfBlob() {
+function buildPdfBlobFromLines(lines) {
   const pageWidth = 842;
   const pageHeight = 595;
   const marginX = 36;
   const startY = 552;
   const lineHeight = 13;
   const linesPerPage = 39;
-  const lines = buildPdfLines();
   const pages = [];
 
   for (let index = 0; index < lines.length; index += linesPerPage) {
@@ -2364,6 +3325,10 @@ function buildPdfBlob() {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
+function buildPdfBlob() {
+  return buildPdfBlobFromLines(buildPdfLines());
+}
+
 function createPdfFile() {
   const blob = buildPdfBlob();
   const name = reportFileStem(".pdf");
@@ -2396,7 +3361,84 @@ async function sharePdfReport() {
   window.alert("Bu cihaz PDF dosyasini dogrudan paylasamadigi icin PDF indirildi. Acilan WhatsApp mesajina PDF dosyasini ekleyebilirsin.");
 }
 
+function buildPrintableIssueTable(title, rows, emptyText) {
+  const body = rows.length
+    ? rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.department)}</td>
+        <td><strong>${escapeHtml(row.product)}</strong></td>
+        <td>${escapeHtml(row.current)}</td>
+        <td>${escapeHtml(row.minimum)}</td>
+        <td>${escapeHtml(row.actionQty)}</td>
+        <td>${escapeHtml(row.reason)}</td>
+        <td>${escapeHtml(row.savedBy)}${row.savedAt ? ` / ${escapeHtml(row.savedAt)}` : ""}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="7">${escapeHtml(emptyText)}</td></tr>`;
+
+  return `
+    <h2>${escapeHtml(title)}</h2>
+    <table>
+      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>Aksiyon</th><th>Açıklama</th><th>Kaydeden</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
 function buildPrintableReportHtml() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const criticalRows = reportIssueRows(snapshot, "critical");
+  const manualRows = reportIssueRows(snapshot, "manual");
+  return `<!doctype html>
+  <html lang="tr">
+    <head>
+      <meta charset="utf-8">
+      <title>Stok Aksiyon Raporu ${escapeHtml(state.reportDate)}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 28px; color: #16211f; font-family: Arial, Helvetica, sans-serif; }
+        header { display: flex; justify-content: space-between; gap: 18px; border-bottom: 3px solid #0f6758; padding-bottom: 16px; margin-bottom: 18px; }
+        h1, h2 { margin: 0; }
+        h1 { font-size: 24px; letter-spacing: 0; }
+        h2 { font-size: 16px; margin: 24px 0 10px; color: #0f6758; }
+        .meta { color: #60716d; line-height: 1.5; text-align: right; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+        .stat { border: 1px solid #d7e1de; border-radius: 8px; padding: 10px; }
+        .stat strong { display: block; font-size: 20px; }
+        .stat span { color: #60716d; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; page-break-inside: auto; margin-bottom: 18px; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        th, td { border: 1px solid #d7e1de; padding: 8px 9px; text-align: left; vertical-align: top; font-size: 12px; }
+        th { background: #eef4f2; color: #0f6758; text-transform: uppercase; font-size: 11px; }
+        .note { margin-top: 18px; color: #60716d; font-size: 12px; }
+        @page { size: A4 landscape; margin: 12mm; }
+        @media print { body { padding: 0; } .no-print { display: none; } }
+      </style>
+    </head>
+    <body>
+      <button class="no-print" onclick="window.print()" style="margin-bottom:14px;padding:10px 14px;border:0;border-radius:8px;background:#0f6758;color:white;font-weight:700">PDF / Yazdır</button>
+      <header>
+        <div>
+          <h1>Otel Yönetim Stok ve Satın Alma Aksiyon Raporu</h1>
+          <p>Yalnızca kritik stok seviyesi ve manuel sipariş talepleri raporlanır.</p>
+        </div>
+        <div class="meta">
+          <strong>Tarih:</strong> ${escapeHtml(state.reportDate)}<br>
+          <strong>Kapsam:</strong> ${escapeHtml(reportScopeLabel())}<br>
+          <strong>Oluşturan:</strong> ${escapeHtml(state.user?.name || "")}
+        </div>
+      </header>
+      <section class="stats">
+        <div class="stat"><strong>${criticalRows.length}</strong><span>Kritik stok</span></div>
+        <div class="stat"><strong>${manualRows.length}</strong><span>Manuel talep</span></div>
+        <div class="stat"><strong>${snapshot.orderNeededItems.length}</strong><span>Toplam aksiyon</span></div>
+        <div class="stat"><strong>${reportAffectedDepartmentCount(snapshot)}</strong><span>Departman</span></div>
+      </section>
+      ${buildPrintableIssueTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
+      ${buildPrintableIssueTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
+      <p class="note">Normal stok kalemleri sistemde saklanır; satın alma aksiyonu gerektirmediği için bu kurumsal rapora dahil edilmez.</p>
+    </body>
+  </html>`;
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const rows = reportProductRows();
   const detailRows = rows.map((row) => `
@@ -2990,6 +4032,28 @@ function renderLogin() {
 }
 
 function exportCsv() {
+  const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
+  const actionRows = [
+    ...reportIssueRows(snapshot, "critical").map((row) => ["Kritik stok", row]),
+    ...reportIssueRows(snapshot, "manual").map((row) => ["Manuel talep", row]),
+  ];
+  const executiveHeader = ["Tarih", "Rapor Bolumu", "Departman", "Urun", "Mevcut", "Minimum", "Aksiyon Miktari", "Aciklama", "Kaydeden", "Saat"];
+  const executiveCsv = [executiveHeader, ...actionRows.map(([section, row]) => [
+    state.reportDate,
+    section,
+    row.department,
+    row.product,
+    row.current,
+    row.minimum,
+    row.actionQty,
+    row.reason,
+    row.savedBy,
+    row.savedAt,
+  ])]
+    .map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
+    .join("\n");
+  downloadBlob(new Blob([`\ufeff${executiveCsv}`], { type: "text/csv;charset=utf-8" }), reportFileStem(".csv"));
+  return;
   const header = ["Tarih", "Departman", "Ürün", "Birim", "Önceki", "Minimum", "Sayım", "Durum", "Kaydeden", "Saat", "Not", "Manuel Sipariş", "Talep Miktarı", "Talep Gerekçesi"];
   const rows = visibleProducts().map((product) => {
     const count = getCount(product.id, state.reportDate);
@@ -3166,6 +4230,33 @@ app.addEventListener("click", async (event) => {
     await openEmailReport();
   }
 
+  if (action === "copy-portion-report") {
+    await copyText(buildPortionReportText());
+    target.textContent = "Kopyalandı";
+    setTimeout(render, 900);
+  }
+
+  if (action === "download-portion-pdf") {
+    downloadPortionPdfReport();
+  }
+
+  if (action === "share-portion-pdf") {
+    try {
+      await sharePortionPdfReport();
+    } catch (error) {
+      console.warn("Porsiyon PDF paylaşımı başarısız.", error);
+      downloadPortionPdfReport();
+    }
+  }
+
+  if (action === "download-portion-excel") {
+    downloadPortionExcelReport();
+  }
+
+  if (action === "share-portion-whatsapp") {
+    openWhatsAppPortionReport();
+  }
+
   if (action === "send-reminder-mail") {
     try {
       const result = await apiRequest("/api/mail/send-reminder", { method: "POST" });
@@ -3331,6 +4422,33 @@ app.addEventListener("submit", async (event) => {
 
   if (action === "product-form") {
     upsertProduct(event.target);
+    render();
+  }
+
+  if (action === "portion-form") {
+    const formData = new FormData(event.target);
+    state.portionSettings = normalizePortionSettings({
+      ...state.portionSettings,
+      people: formData.get("people"),
+      profileId: String(formData.get("profileId") || state.portionSettings.profileId),
+      departmentId: String(formData.get("departmentId") || state.portionSettings.departmentId),
+      date: String(formData.get("date") || state.portionSettings.date),
+      bufferPercent: formData.get("bufferPercent"),
+    });
+    save("hotel-portion-settings", state.portionSettings);
+    if (firebaseState.enabled) {
+      await syncFirebaseDate(state.portionSettings.date);
+    }
+    render();
+  }
+
+  if (action === "portion-note-form") {
+    const formData = new FormData(event.target);
+    state.portionSettings = normalizePortionSettings({
+      ...state.portionSettings,
+      note: String(formData.get("note") || "").trim(),
+    });
+    save("hotel-portion-settings", state.portionSettings);
     render();
   }
 

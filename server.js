@@ -528,7 +528,114 @@ function manualOrderRequests(db, date, departmentId = "all") {
   return buildDailyReport(db, date, departmentId).manualOrderRequests;
 }
 
+function actionReportRows(report, type) {
+  const items = type === "critical"
+    ? report.orderItems.filter((item) => item.qty <= item.minQty)
+    : report.manualOrderRequests;
+  return items.map((item) => {
+    const shortage = Math.max(Number(item.minQty) - Number(item.qty), 0);
+    const requestedQty = item.requestedQty ? `${item.requestedQty} ${item.unit}` : "";
+    return {
+      departmentName: item.departmentName,
+      productName: item.productName,
+      current: `${item.qty} ${item.unit}`,
+      minimum: `${item.minQty} ${item.unit}`,
+      actionQty: type === "critical"
+        ? (shortage > 0 ? `${shortage} ${item.unit}` : "Satın alma onayı")
+        : (requestedQty || "Miktar belirtilmedi"),
+      reason: type === "critical"
+        ? (item.note || "Minimum stok seviyesinin altında")
+        : (item.reason || "Manuel satın alma talebi"),
+    };
+  });
+}
+
+function appendActionReportTextSection(lines, title, rows, emptyText) {
+  lines.push("");
+  lines.push(title);
+  lines.push("-".repeat(title.length));
+  if (rows.length === 0) {
+    lines.push(emptyText);
+    return;
+  }
+  rows.forEach((row, index) => {
+    lines.push(`${index + 1}. ${row.departmentName} / ${row.productName}`);
+    lines.push(`   Mevcut: ${row.current} | Minimum: ${row.minimum} | Aksiyon: ${row.actionQty}`);
+    lines.push(`   Açıklama: ${row.reason}`);
+  });
+}
+
+function buildOrderActionReportMail(db, date, departmentId = "all") {
+  const settings = normalizeMailSettings(db.mailSettings).report;
+  const report = buildDailyReport(db, date, departmentId);
+  const criticalRows = actionReportRows(report, "critical");
+  const manualRows = actionReportRows(report, "manual");
+  const affectedDepartments = new Set([...criticalRows, ...manualRows].map((item) => item.departmentName)).size;
+  const lines = [
+    "OTEL YÖNETİM STOK VE SATIN ALMA AKSİYON RAPORU",
+    `Tarih: ${date}`,
+    `Kapsam: ${departmentName(db, departmentId)}`,
+    `Alıcılar: ${settings.recipients}`,
+    "",
+    "Yönetici Özeti",
+    "--------------",
+    `Kritik stok kalemi: ${criticalRows.length}`,
+    `Manuel sipariş talebi: ${manualRows.length}`,
+    `Toplam satın alma aksiyonu: ${report.totals.orderNeededItems}`,
+    `Etkilenen departman: ${affectedDepartments}`,
+  ];
+
+  appendActionReportTextSection(lines, "1. KRİTİK STOK SEVİYESİNE DÜŞEN ÜRÜNLER", criticalRows, "Kritik stok seviyesine düşen ürün yok.");
+  appendActionReportTextSection(lines, "2. STOK YETERLİ OLSA DA TALEP EDİLEN ÜRÜNLER", manualRows, "Manuel sipariş talebi yok.");
+  lines.push("");
+  lines.push("Not: Rapor yalnızca satın alma aksiyonu gerektiren kalemleri içerir. Normal stok kalemleri sistemde saklanır, bu rapora dahil edilmez.");
+  return lines.join("\n");
+}
+
+function actionReportHtmlTable(title, rows, emptyText) {
+  const body = rows.length
+    ? rows.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.departmentName)}</td>
+        <td><strong>${escapeHtml(item.productName)}</strong></td>
+        <td>${escapeHtml(item.current)}</td>
+        <td>${escapeHtml(item.minimum)}</td>
+        <td>${escapeHtml(item.actionQty)}</td>
+        <td>${escapeHtml(item.reason)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="6">${escapeHtml(emptyText)}</td></tr>`;
+  return `
+    <h3 style="margin:22px 0 8px;color:#0f6758">${escapeHtml(title)}</h3>
+    <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
+      <tr style="background:#eef4f2"><th align="left">Departman</th><th align="left">Ürün</th><th align="left">Mevcut</th><th align="left">Minimum</th><th align="left">Aksiyon</th><th align="left">Açıklama</th></tr>
+      ${body}
+    </table>
+  `;
+}
+
+function buildOrderActionReportHtml(db, date, departmentId = "all") {
+  const report = buildDailyReport(db, date, departmentId);
+  const criticalRows = actionReportRows(report, "critical");
+  const manualRows = actionReportRows(report, "manual");
+  const affectedDepartments = new Set([...criticalRows, ...manualRows].map((item) => item.departmentName)).size;
+  return `
+    <div style="font-family:Arial,sans-serif;color:#16211f;line-height:1.5">
+      <h2 style="margin:0 0 8px;color:#0f6758">Otel Yönetim Stok ve Satın Alma Aksiyon Raporu</h2>
+      <p style="margin:0 0 18px;color:#60716d">Tarih: ${escapeHtml(date)} | Kapsam: ${escapeHtml(departmentName(db, departmentId))}</p>
+      <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:18px">
+        <tr style="background:#eef4f2"><th align="left">Kritik stok</th><th align="left">Manuel talep</th><th align="left">Toplam aksiyon</th><th align="left">Etkilenen departman</th></tr>
+        <tr><td>${criticalRows.length}</td><td>${manualRows.length}</td><td>${report.totals.orderNeededItems}</td><td>${affectedDepartments}</td></tr>
+      </table>
+      ${actionReportHtmlTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
+      ${actionReportHtmlTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
+      <p style="color:#60716d;font-size:12px">Normal stok kalemleri sistemde saklanır; satın alma aksiyonu gerektirmediği için bu rapora dahil edilmez.</p>
+    </div>
+  `;
+}
+
 function buildOrderReportMail(db, date, departmentId = "all") {
+  return buildOrderActionReportMail(db, date, departmentId);
   const settings = normalizeMailSettings(db.mailSettings).report;
   const report = buildDailyReport(db, date, departmentId);
   const lines = [
@@ -605,6 +712,7 @@ function buildOrderReportMail(db, date, departmentId = "all") {
 }
 
 function buildOrderReportHtml(db, date, departmentId = "all") {
+  return buildOrderActionReportHtml(db, date, departmentId);
   const settings = normalizeMailSettings(db.mailSettings).report;
   const report = buildDailyReport(db, date, departmentId);
   const rows = (items, emptyText) => {
