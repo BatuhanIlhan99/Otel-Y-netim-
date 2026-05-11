@@ -1721,18 +1721,28 @@ function navButton(view, label) {
 }
 
 function renderTopbar() {
+  const todaySnapshot = state.user ? buildDailyReportSnapshot(todayKey(), state.user.role === "admin" ? "all" : state.user.departmentId) : null;
+  const counted = todaySnapshot ? todaySnapshot.productStates.length - todaySnapshot.notCounted.length : 0;
+  const total = todaySnapshot?.productStates.length || 0;
+  const completion = total ? Math.round((counted / total) * 100) : 0;
   return `
     <header class="topbar">
       <div>
         <p class="eyebrow">${departmentName(state.selectedDepartment)}</p>
         <h2>${viewTitle()}</h2>
       </div>
-      <div class="date-pill">${new Date().toLocaleDateString("tr-TR", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })}</div>
+      <div class="topbar-actions">
+        <div class="ops-pill">
+          <strong>%${completion}</strong>
+          <span>Bugunku sayim</span>
+        </div>
+        <div class="date-pill">${new Date().toLocaleDateString("tr-TR", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })}</div>
+      </div>
     </header>
   `;
 }
@@ -4121,11 +4131,17 @@ function renderLogin() {
     <section class="login-page">
       <div class="login-card">
         <div class="login-intro">
+          <div class="login-brand-mark">OY</div>
           <div>
             <p class="eyebrow">Günlük operasyon</p>
             <h1>Otel yönetimi tek ekranda.</h1>
           </div>
           <p>Personel kendi departmanına girer, sayımı tamamlar; yönetici stok, sipariş ve mail raporlarını tek yerden takip eder.</p>
+          <div class="login-metrics">
+            <div><strong>5</strong><span>Departman</span></div>
+            <div><strong>24/7</strong><span>Stok kontrol</span></div>
+            <div><strong>PDF</strong><span>Yonetici raporu</span></div>
+          </div>
         </div>
         <form class="login-form" data-action="login">
           <div>
