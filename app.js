@@ -8,6 +8,8 @@ const departments = [
 
 const users = [
   { username: "admin", password: "admin123", name: "Yönetici", role: "admin", departmentId: "all" },
+  { username: "satinalma", password: "SatinAlma2026", name: "Satın Alma Sorumlusu", role: "admin", departmentId: "all" },
+  { username: "operasyon", password: "Operasyon2026", name: "Operasyon Müdürü", role: "admin", departmentId: "all" },
   { username: "temizlik", password: "Temizlik2026", name: "Temizlik Kullanıcısı", role: "staff", departmentId: "temizlik" },
   { username: "mutfak", password: "Mutfak2026", name: "Mutfak Kullanıcısı", role: "staff", departmentId: "gulplaj-restorant" },
   { username: "bufe", password: "Bufe2026", name: "Büfe Kullanıcısı", role: "staff", departmentId: "gulplaj-bufe" },
@@ -1594,6 +1596,24 @@ function shouldOrderItem(item) {
   return item.qty <= Number(item.product.minQty) || hasManualOrderRequest(item.count);
 }
 
+function orderStatusMeta(status = "pending") {
+  const statuses = {
+    pending: { label: "Yonetici onayi bekliyor", cls: "warn" },
+    approved: { label: "Onaylandi", cls: "ok" },
+    ordered: { label: "Siparise alindi", cls: "ok" },
+    rejected: { label: "Reddedildi", cls: "danger" },
+  };
+  return statuses[status] || statuses.pending;
+}
+
+function orderPriorityLabel(item) {
+  if (!item) return "Planli";
+  if (item.qty <= Number(item.product.minQty) * 0.5) return "Acil";
+  if (item.qty <= Number(item.product.minQty)) return "Bugun";
+  if (hasManualOrderRequest(item.count)) return "Yonetici onayi";
+  return "Planli";
+}
+
 function setTodayCount(productId, qty, note = "", orderRequest = null) {
   const product = state.products.find((item) => item.id === productId);
   const date = todayKey();
@@ -1616,6 +1636,33 @@ function setTodayCount(productId, qty, note = "", orderRequest = null) {
     method: "POST",
     body: JSON.stringify({ date, productId, ...entry }),
   }).catch((error) => console.warn("Sayım backend'e yazılamadı.", error));
+}
+
+function setOrderRequestStatus(productId, status) {
+  const date = state.reportDate || todayKey();
+  const count = getCount(productId, date);
+  const product = state.products.find((item) => item.id === productId);
+  if (!count || !product) {
+    window.alert("Bu talep icin once stok sayimi kaydi olusturulmali.");
+    return;
+  }
+
+  const orderRequest = {
+    ...(count.orderRequest || {}),
+    requested: true,
+    status,
+    statusBy: state.user?.name || "",
+    statusAt: new Date().toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }),
+  };
+  state.counts[date][productId] = { ...count, orderRequest };
+  save("hotel-stock-counts", state.counts);
+  if (firebaseState.enabled) {
+    saveCountToFirebase(date, productId, state.counts[date][productId]).catch((error) => console.warn("Talep durumu Firebase'e yazilamadi.", error));
+  }
+  apiRequest("/api/counts", {
+    method: "POST",
+    body: JSON.stringify({ date, productId, ...state.counts[date][productId] }),
+  }).catch((error) => console.warn("Talep durumu backend'e yazilamadi.", error));
 }
 
 function render() {
@@ -1733,13 +1780,137 @@ function viewTitle() {
 }
 
 function renderView() {
-  if (state.view === "dashboard") return renderDashboard();
+  if (state.view === "dashboard") return renderDashboardPro();
   if (state.view === "rapor") return renderExecutiveReport();
   if (state.view === "porsiyon") return renderPortionAnalysis();
   if (state.view === "urunler") return renderProductsAdmin();
   if (state.view === "ayarlar") return renderMailSettings();
   if (state.view === "kullanicilar") return renderUsers();
   return renderCounting();
+}
+
+function renderDashboardPro() {
+  const activeProducts = state.products.filter((product) => product.active);
+  const snapshot = buildDailyReportSnapshot(todayKey(), "all");
+  const portionSnapshot = buildPortionAnalysisSnapshot({ ...state.portionSettings, date: todayKey() });
+  const countedProducts = snapshot.productStates.length - snapshot.notCounted.length;
+  const completion = snapshot.productStates.length ? Math.round((countedProducts / snapshot.productStates.length) * 100) : 0;
+  const incompleteDepartments = snapshot.departmentSummaries.filter((item) => item.missing > 0).length;
+  const operationScore = Math.max(
+    0,
+    Math.min(100, Math.round(completion - (snapshot.criticalItems.length * 4) - (snapshot.manualRequests.length * 2) - (portionSnapshot.shortageRows.length * 3) - (incompleteDepartments * 5) + 18))
+  );
+  const scoreClass = operationScore >= 82 ? "ok" : operationScore >= 62 ? "warn" : "danger";
+
+  const actionRows = snapshot.orderNeededItems.slice(0, 8).map(({ product, count, qty }) => `
+    <tr>
+      <td data-label="Urun"><strong>${escapeHtml(product.name)}</strong><br><span class="hint">${departmentName(product.departmentId)}</span></td>
+      <td data-label="Mevcut">${formatReportNumber(qty)} ${escapeHtml(product.unit)}</td>
+      <td data-label="Minimum">${formatReportNumber(product.minQty)} ${escapeHtml(product.unit)}</td>
+      <td data-label="Oncelik"><span class="badge ${qty <= product.minQty ? "danger" : "warn"}">${escapeHtml(orderPriorityLabel({ product, count, qty }))}</span></td>
+    </tr>
+  `).join("");
+
+  const departmentRows = snapshot.departmentSummaries.map((item) => `
+    <tr>
+      <td data-label="Departman"><strong>${departmentStockTitle(item.department)}</strong></td>
+      <td data-label="Sayim">${item.counted} / ${item.products}<br><span class="hint">%${item.completion}</span></td>
+      <td data-label="Kritik">${item.critical}</td>
+      <td data-label="Talep">${item.manual}</td>
+      <td data-label="Durum"><span class="badge ${item.missing ? "danger" : "ok"}">${item.missing ? `${item.missing} eksik` : "Tamamlandi"}</span></td>
+    </tr>
+  `).join("");
+
+  const portionRows = portionSnapshot.shortageRows.slice(0, 6).map((row) => `
+    <tr>
+      <td data-label="Departman">${escapeHtml(portionDepartmentLabel(row.product.departmentId))}</td>
+      <td data-label="Urun"><strong>${escapeHtml(row.product.name)}</strong><br><span class="hint">${escapeHtml(row.rule.label)}</span></td>
+      <td data-label="Acik">${escapeHtml(formatReportNumber(row.shortage))} ${escapeHtml(row.product.unit)}</td>
+      <td data-label="Karsilama">%${row.coverage}</td>
+    </tr>
+  `).join("");
+
+  const decisionCards = [
+    ["Sayim disiplini", `%${completion}`, incompleteDepartments ? `${incompleteDepartments} departman tamamlanmadi` : "Tum departmanlar tamam"],
+    ["Satinalma aksiyonu", snapshot.orderNeededItems.length, `${snapshot.criticalItems.length} kritik, ${snapshot.manualRequests.length} talep`],
+    ["Kisi analizi", portionSnapshot.shortageRows.length, `${state.portionSettings.people} kisi icin riskli kalem`],
+    ["Rapor saati", state.mailSettings.report.sendTime, state.mailSettings.report.recipients],
+  ].map(([title, value, detail]) => `
+    <div>
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(title)}</span>
+      <small>${escapeHtml(detail)}</small>
+    </div>
+  `).join("");
+
+  return `
+    <section class="panel command-panel">
+      <div class="command-hero">
+        <div>
+          <p class="eyebrow">Gunluk operasyon merkezi</p>
+          <h3>Bugunun stok karari tek ekranda</h3>
+          <span>${completion}% sayim tamamlandi, ${snapshot.criticalItems.length} kritik stok, ${snapshot.manualRequests.length} manuel talep, ${portionSnapshot.shortageRows.length} porsiyon riski.</span>
+        </div>
+        <span class="badge ${scoreClass}">Operasyon skoru %${operationScore}</span>
+      </div>
+      <div class="command-actions">
+        <button class="btn" data-view="sayim">Sayim ekranina git</button>
+        <button class="btn secondary" data-view="rapor">Kurumsal rapor</button>
+        <button class="btn secondary" data-view="porsiyon">Kisi analizi</button>
+        <button class="btn secondary" data-view="ayarlar">Mail merkezi</button>
+      </div>
+    </section>
+    <div class="executive-decision-grid">${decisionCards}</div>
+    <div class="grid executive-layout">
+      <section class="panel">
+        <div class="panel-head">
+          <h3 class="panel-title">Bugunun satinalma aksiyonlari</h3>
+          <button class="btn secondary" data-view="rapor">Raporu ac</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Urun</th><th>Mevcut</th><th>Minimum</th><th>Oncelik</th></tr></thead>
+            <tbody>${actionRows || `<tr><td data-label="Durum" colspan="4" class="empty">Bugun siparis gerektiren urun yok.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h3 class="panel-title">Departman sayim disiplini</h3>
+          <button class="btn secondary" data-view="sayim">Sayim ekrani</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Departman</th><th>Sayim</th><th>Kritik</th><th>Talep</th><th>Durum</th></tr></thead>
+            <tbody>${departmentRows}</tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h3 class="panel-title">Kisi sayisina gore riskler</h3>
+          <button class="btn secondary" data-view="porsiyon">Analizi ac</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Departman</th><th>Urun</th><th>Acik</th><th>Karsilama</th></tr></thead>
+            <tbody>${portionRows || `<tr><td data-label="Durum" colspan="4" class="empty">Kisi analizine gore acil siparis riski yok.</td></tr>`}</tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
+          <h3 class="panel-title">Mail ve rapor merkezi</h3>
+          <button class="btn secondary" data-view="ayarlar">Ayarlar</button>
+        </div>
+        <div class="settings-list">
+          <div><strong>Personel hatirlatma</strong><span>${escapeHtml(state.mailSettings.reminder.sendTime)} - ${escapeHtml(state.mailSettings.reminder.recipients)}</span></div>
+          <div><strong>Yonetici siparis raporu</strong><span>${escapeHtml(state.mailSettings.report.sendTime)} - ${escapeHtml(state.mailSettings.report.recipients)}</span></div>
+          <div><strong>Dagitim</strong><span>PDF, Excel, WhatsApp ozeti ve mail metni ayni kurumsal rapor setinden uretilir.</span></div>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 function renderDashboard() {
@@ -1908,6 +2079,8 @@ function renderCounting() {
               <th>Bugünkü Sayım</th>
               <th>Not</th>
               <th>Sipariş Talebi</th>
+              <th>Oncelik</th>
+              <th>Onay</th>
               <th>Kaydeden</th>
               <th>Durum</th>
             </tr>
@@ -2003,6 +2176,7 @@ function renderExecutiveReport() {
     ${renderReportExecutiveSummary(snapshot)}
     ${renderReportIssueSection("critical", snapshot)}
     ${renderReportIssueSection("manual", snapshot)}
+    ${renderReportPortionSection()}
     <section class="panel">
       <div class="panel-head">
         <h3 class="panel-title">Kurumsal mail ön izlemesi</h3>
@@ -2039,6 +2213,7 @@ function reportAffectedDepartmentCount(snapshot) {
 }
 
 function renderReportExecutiveSummary(snapshot) {
+  const portionSnapshot = buildPortionAnalysisSnapshot({ ...state.portionSettings, date: state.reportDate });
   return `
     <section class="panel executive-report-summary">
       <div class="executive-report-brand">
@@ -2053,7 +2228,7 @@ function renderReportExecutiveSummary(snapshot) {
         <div><strong>${snapshot.criticalItems.length}</strong><span>Kritik stok kalemi</span></div>
         <div><strong>${snapshot.manualRequests.length}</strong><span>Manuel sipariş talebi</span></div>
         <div><strong>${snapshot.orderNeededItems.length}</strong><span>Toplam aksiyon</span></div>
-        <div><strong>${reportAffectedDepartmentCount(snapshot)}</strong><span>Etkilenen departman</span></div>
+        <div><strong>${portionSnapshot.shortageRows.length}</strong><span>Porsiyon riski</span></div>
       </div>
     </section>
   `;
@@ -2063,10 +2238,12 @@ function reportIssueRows(snapshot, type) {
   const items = type === "critical" ? snapshot.criticalItems : snapshot.manualRequests;
   return items.map(({ product, count, qty }) => {
     const request = count?.orderRequest || {};
+    const statusMeta = orderStatusMeta(request.status);
     const shortage = Math.max(Number(product.minQty) - Number(qty), 0);
     const requestQty = request.qty ? `${formatReportNumber(request.qty)} ${product.unit}` : "";
     const suggestedQty = shortage > 0 ? `${formatReportNumber(shortage)} ${product.unit}` : "Satın alma onayı";
     return {
+      productId: product.id,
       department: departmentStockTitle(departments.find((department) => department.id === product.departmentId) || { id: product.departmentId, name: departmentName(product.departmentId) }),
       product: product.name,
       unit: product.unit,
@@ -2074,6 +2251,10 @@ function reportIssueRows(snapshot, type) {
       minimum: `${formatReportNumber(product.minQty)} ${product.unit}`,
       actionQty: type === "critical" ? suggestedQty : requestQty || "Miktar belirtilmedi",
       reason: type === "critical" ? (count?.note || "Minimum stok seviyesinin altında") : (request.reason || count?.note || "Manuel satın alma talebi"),
+      priority: orderPriorityLabel({ product, count, qty }),
+      status: request.status || "pending",
+      statusLabel: type === "critical" ? "Kritik stok" : statusMeta.label,
+      statusClass: type === "critical" ? "danger" : statusMeta.cls,
       savedBy: count?.user || "Sistem",
       savedAt: count?.time || "",
     };
@@ -2096,6 +2277,8 @@ function renderReportIssueSection(type, snapshot) {
       <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
       <td data-label="${qtyTitle}">${escapeHtml(row.actionQty)}</td>
       <td data-label="Açıklama">${escapeHtml(row.reason)}</td>
+      <td data-label="Oncelik"><span class="badge ${row.priority === "Acil" ? "danger" : row.priority === "Bugun" ? "warn" : ""}">${escapeHtml(row.priority)}</span></td>
+      <td data-label="Onay"><span class="badge ${row.statusClass}">${escapeHtml(row.statusLabel)}</span>${!isCritical && state.user?.role === "admin" ? `<div class="inline-actions order-status-actions"><button class="mini-btn" data-action="set-order-status" data-product-id="${row.productId}" data-status="approved">Onayla</button><button class="mini-btn" data-action="set-order-status" data-product-id="${row.productId}" data-status="ordered">Siparise al</button><button class="mini-btn" data-action="set-order-status" data-product-id="${row.productId}" data-status="rejected">Reddet</button></div>` : ""}</td>
       <td data-label="Kaydeden">${escapeHtml(row.savedBy)}${row.savedAt ? `<br><span class="hint">${escapeHtml(row.savedAt)}</span>` : ""}</td>
     </tr>
   `).join("");
@@ -2119,10 +2302,54 @@ function renderReportIssueSection(type, snapshot) {
               <th>Minimum</th>
               <th>${qtyTitle}</th>
               <th>Açıklama</th>
+              <th>Oncelik</th>
+              <th>Onay</th>
               <th>Kaydeden</th>
             </tr>
           </thead>
-          <tbody>${body || `<tr><td data-label="Durum" colspan="7" class="empty">Bu bölümde raporlanacak ürün yok.</td></tr>`}</tbody>
+          <tbody>${body || `<tr><td data-label="Durum" colspan="9" class="empty">Bu bölümde raporlanacak ürün yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function reportPortionRowsForExecutive() {
+  const snapshot = buildPortionAnalysisSnapshot({ ...state.portionSettings, date: state.reportDate });
+  return {
+    snapshot,
+    rows: [...snapshot.shortageRows, ...snapshot.reviewRows].slice(0, 18),
+  };
+}
+
+function renderReportPortionSection() {
+  const { snapshot, rows } = reportPortionRowsForExecutive();
+  const body = rows.map((row) => `
+    <tr>
+      <td data-label="Departman">${escapeHtml(portionDepartmentLabel(row.product.departmentId))}</td>
+      <td data-label="Urun"><strong>${escapeHtml(row.product.name)}</strong><br><span class="hint">${escapeHtml(row.rule.label)}</span></td>
+      <td data-label="Mevcut">${escapeHtml(formatReportNumber(row.available))} ${escapeHtml(row.product.unit)}</td>
+      <td data-label="Ihtiyac">${escapeHtml(formatReportNumber(row.required))} ${escapeHtml(row.requirementUnit)}</td>
+      <td data-label="Acik">${row.shortage > 0 ? `${escapeHtml(formatReportNumber(row.shortage))} ${escapeHtml(row.product.unit)}` : "-"}</td>
+      <td data-label="Gorus">${escapeHtml(row.opinion)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <section class="panel report-issue-panel portion-report-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Kisi sayisina gore stok yeterlilik gorusu</h3>
+          <span class="hint">${escapeHtml(snapshot.settings.people)} kisi, ${escapeHtml(snapshot.profile.label)} ve %${snapshot.settings.bufferPercent} emniyet payi ile uretilen satin alma gorusudur.</span>
+        </div>
+        <span class="badge ${snapshot.shortageRows.length ? "danger" : snapshot.reviewRows.length ? "warn" : "ok"}">${snapshot.shortageRows.length} siparis / ${snapshot.reviewRows.length} gorus</span>
+      </div>
+      <div class="table-wrap report-action-table">
+        <table>
+          <thead>
+            <tr><th>Departman</th><th>Urun</th><th>Mevcut</th><th>Ihtiyac</th><th>Acik</th><th>Gorus</th></tr>
+          </thead>
+          <tbody>${body || `<tr><td data-label="Durum" colspan="6" class="empty">Kisi sayisina gore rapora girecek riskli kalem yok.</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -2656,6 +2883,7 @@ function buildExecutiveMailReport() {
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const criticalRows = reportIssueRows(snapshot, "critical");
   const manualRows = reportIssueRows(snapshot, "manual");
+  const portionReport = reportPortionRowsForExecutive();
   const lines = [
     "OTEL YÖNETİM STOK VE SATIN ALMA AKSİYON RAPORU",
     `Tarih: ${snapshot.date}`,
@@ -2668,11 +2896,12 @@ function buildExecutiveMailReport() {
     `Kritik stok kalemi: ${criticalRows.length}`,
     `Manuel sipariş talebi: ${manualRows.length}`,
     `Toplam satın alma aksiyonu: ${snapshot.orderNeededItems.length}`,
-    `Etkilenen departman: ${reportAffectedDepartmentCount(snapshot)}`,
+    `Porsiyon riski: ${portionReport.snapshot.shortageRows.length}`,
   ];
 
   appendExecutiveMailSection(lines, "1. KRİTİK STOK SEVİYESİNE DÜŞEN ÜRÜNLER", criticalRows, "Kritik stok seviyesine düşen ürün yok.");
   appendExecutiveMailSection(lines, "2. STOK YETERLİ OLSA DA TALEP EDİLEN ÜRÜNLER", manualRows, "Manuel sipariş talebi yok.");
+  appendPortionTextSection(lines, "3. KISI SAYISINA GORE STOK YETERLILIK GORUSU", portionReport.rows, "Kisi sayisina gore rapora girecek riskli kalem yok.");
 
   lines.push("");
   lines.push("Not: Rapor yalnızca satın alma aksiyonu gerektiren kalemleri içerir. Normal stok kalemleri sistemde saklanır, bu rapora dahil edilmez.");
@@ -3047,6 +3276,7 @@ function buildExcelHtml() {
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const criticalRows = reportIssueRows(snapshot, "critical");
   const manualRows = reportIssueRows(snapshot, "manual");
+  const portionReport = reportPortionRowsForExecutive();
   return `<!doctype html>
   <html>
     <head>
@@ -3069,6 +3299,11 @@ function buildExcelHtml() {
       </table>
       ${buildExcelIssueTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
       ${buildExcelIssueTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
+      <h3>Kisi sayisina gore stok yeterlilik gorusu</h3>
+      <table>
+        <thead><tr><th>Departman</th><th>Urun</th><th>Kategori</th><th>Mevcut</th><th>Ihtiyac</th><th>Acik</th><th>Karsilama</th><th>Durum</th><th>Gorus</th></tr></thead>
+        <tbody>${portionExcelRows(portionReport.rows, "Kisi sayisina gore rapora girecek riskli kalem yok.")}</tbody>
+      </table>
     </body>
   </html>`;
   const rows = reportProductRows();
@@ -3203,6 +3438,18 @@ function buildPdfLines() {
     });
   }
 
+  const portionReport = reportPortionRowsForExecutive();
+  lines.push("", "3. KISI SAYISINA GORE STOK YETERLILIK GORUSU");
+  if (portionReport.rows.length === 0) {
+    lines.push("Kisi sayisina gore rapora girecek riskli kalem yok.");
+  } else {
+    portionReport.rows.forEach((row, index) => {
+      lines.push(`${index + 1}. ${portionDepartmentLabel(row.product.departmentId)} / ${row.product.name}`);
+      lines.push(`   Mevcut: ${formatReportNumber(row.available)} ${row.product.unit} | Ihtiyac: ${formatReportNumber(row.required)} ${row.requirementUnit}`);
+      lines.push(`   Gorus: ${row.opinion}`);
+    });
+  }
+
   return lines.map(toPdfText);
 }
 
@@ -3323,10 +3570,35 @@ function buildPrintableIssueTable(title, rows, emptyText) {
   `;
 }
 
+function buildPrintablePortionTable(title, rows, emptyText) {
+  const body = rows.length
+    ? rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(portionDepartmentLabel(row.product.departmentId))}</td>
+        <td><strong>${escapeHtml(row.product.name)}</strong></td>
+        <td>${escapeHtml(row.rule.label)}</td>
+        <td>${escapeHtml(formatReportNumber(row.available))} ${escapeHtml(row.product.unit)}</td>
+        <td>${escapeHtml(formatReportNumber(row.required))} ${escapeHtml(row.requirementUnit)}</td>
+        <td>${row.shortage > 0 ? `${escapeHtml(formatReportNumber(row.shortage))} ${escapeHtml(row.product.unit)}` : "-"}</td>
+        <td>${escapeHtml(row.opinion)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="7">${escapeHtml(emptyText)}</td></tr>`;
+
+  return `
+    <h2>${escapeHtml(title)}</h2>
+    <table>
+      <thead><tr><th>Departman</th><th>Urun</th><th>Kategori</th><th>Mevcut</th><th>Ihtiyac</th><th>Acik</th><th>Gorus</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
 function buildPrintableReportHtml() {
   const snapshot = buildDailyReportSnapshot(state.reportDate, reportDepartmentId());
   const criticalRows = reportIssueRows(snapshot, "critical");
   const manualRows = reportIssueRows(snapshot, "manual");
+  const portionReport = reportPortionRowsForExecutive();
   return `<!doctype html>
   <html lang="tr">
     <head>
@@ -3374,6 +3646,7 @@ function buildPrintableReportHtml() {
       </section>
       ${buildPrintableIssueTable("Kritik stok seviyesine düşen ürünler", criticalRows, "Kritik stok seviyesine düşen ürün yok.")}
       ${buildPrintableIssueTable("Stok yeterli olsa da talep edilen ürünler", manualRows, "Manuel sipariş talebi yok.")}
+      ${buildPrintablePortionTable("Kisi sayisina gore stok yeterlilik gorusu", portionReport.rows, "Kisi sayisina gore rapora girecek riskli kalem yok.")}
       <p class="note">Normal stok kalemleri sistemde saklanır; satın alma aksiyonu gerektirmediği için bu kurumsal rapora dahil edilmez.</p>
     </body>
   </html>`;
@@ -3874,7 +4147,7 @@ function renderLogin() {
             <label for="password">Şifre</label>
             <input id="password" name="password" type="password" autocomplete="current-password" value="admin123" />
           </div>
-          <div class="hint">Demo kullanıcıları: admin/admin123, temizlik/Temizlik2026, mutfak/Mutfak2026, bufe/Bufe2026, resepsiyon/Resepsiyon2026</div>
+          <div class="hint">Demo kullanıcıları: admin/admin123, satinalma/SatinAlma2026, operasyon/Operasyon2026, temizlik/Temizlik2026, mutfak/Mutfak2026, bufe/Bufe2026, resepsiyon/Resepsiyon2026</div>
           <div class="error" data-error></div>
           <button class="btn" type="submit">Giriş yap</button>
         </form>
@@ -4025,8 +4298,9 @@ app.addEventListener("click", async (event) => {
       const requested = requestedByCheck || String(orderQty).trim() !== "" || String(reason).trim() !== "";
       if (input.value !== "" || requested || note.trim() !== "") {
         const qty = input.value !== "" ? input.value : productFallbackQty(input.dataset.count);
+        const existingRequest = getTodayCount(input.dataset.count)?.orderRequest || {};
         const orderRequest = requested
-          ? { requested: true, qty: Number(orderQty || 0), reason }
+          ? { requested: true, qty: Number(orderQty || 0), reason, status: existingRequest.status || "pending" }
           : { requested: false, qty: 0, reason: "" };
         setTodayCount(input.dataset.count, qty, note, orderRequest);
       }
@@ -4151,6 +4425,11 @@ app.addEventListener("click", async (event) => {
       return;
     }
     await refreshMailStatus(true);
+  }
+
+  if (action === "set-order-status") {
+    setOrderRequestStatus(target.dataset.productId, target.dataset.status || "pending");
+    render();
   }
 
   if (action === "edit-product") {

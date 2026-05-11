@@ -1,7 +1,10 @@
 @echo off
 cd /d "%~dp0"
-if not exist node_modules (
-  echo Ilk kurulum yapiliyor...
-  npm install
+echo Otel Yonetim backend baslatiliyor...
+set "NODE_EXE=%LOCALAPPDATA%\OpenAI\Codex\bin\node.exe"
+if exist "%NODE_EXE%" (
+  "%NODE_EXE%" server.js
+) else (
+  node server.js
 )
-npm start
+pause

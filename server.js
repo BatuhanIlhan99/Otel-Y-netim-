@@ -2,7 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+let nodemailer = null;
+try {
+  nodemailer = require("nodemailer");
+} catch {
+  nodemailer = null;
+}
 
 const ROOT = __dirname;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data"));
@@ -165,6 +170,8 @@ function defaultDepartments() {
 function defaultUsers() {
   return [
     { username: "admin", password: "admin123", name: "Yönetici", role: "admin", departmentId: "all" },
+    { username: "satinalma", password: "SatinAlma2026", name: "Satın Alma Sorumlusu", role: "admin", departmentId: "all" },
+    { username: "operasyon", password: "Operasyon2026", name: "Operasyon Müdürü", role: "admin", departmentId: "all" },
     { username: "temizlik", password: "Temizlik2026", name: "Temizlik Kullanıcısı", role: "staff", departmentId: "temizlik" },
     { username: "mutfak", password: "Mutfak2026", name: "Mutfak Kullanıcısı", role: "staff", departmentId: "gulplaj-restorant" },
     { username: "bufe", password: "Bufe2026", name: "Büfe Kullanıcısı", role: "staff", departmentId: "gulplaj-bufe" },
@@ -280,6 +287,13 @@ function normalizeDb(db) {
   normalized.mailSettings = normalizeMailSettings(normalized.mailSettings);
 
   let migrated = false;
+  const existingUsernames = new Set(normalized.users.map((user) => user.username));
+  defaultUsers().forEach((user) => {
+    if (!existingUsernames.has(user.username)) {
+      migrated = true;
+      normalized.users.push(user);
+    }
+  });
   normalized.users = normalized.users.map((user) => {
     if (user.password && !user.passwordHash) {
       migrated = true;
@@ -435,8 +449,11 @@ function buildDailyReport(db, date, departmentId = "all") {
             requested: true,
             requestedQty: Number(request.qty || 0),
             reason: request.reason || "",
+            status: request.status || "pending",
+            statusBy: request.statusBy || "",
+            statusAt: request.statusAt || "",
           }
-        : { requested: false, requestedQty: 0, reason: "" },
+        : { requested: false, requestedQty: 0, reason: "", status: "pending" },
     };
   });
 
@@ -456,6 +473,9 @@ function buildDailyReport(db, date, departmentId = "all") {
       time: item.time,
       requestedQty: item.orderRequest.requestedQty,
       reason: item.orderRequest.reason,
+      status: item.orderRequest.status,
+      statusBy: item.orderRequest.statusBy,
+      statusAt: item.orderRequest.statusAt,
       manualRequest: item.orderRequest.requested,
     }));
 
@@ -471,6 +491,9 @@ function buildDailyReport(db, date, departmentId = "all") {
       minQty: item.minQty,
       requestedQty: item.orderRequest.requestedQty,
       reason: item.orderRequest.reason,
+      status: item.orderRequest.status,
+      statusBy: item.orderRequest.statusBy,
+      statusAt: item.orderRequest.statusAt,
     }));
 
   const departmentSummaries = (db.departments || [])
@@ -862,7 +885,7 @@ function lastDelivery(kind) {
 }
 
 function smtpEnabled() {
-  return String(process.env.SMTP_ENABLED || "false").toLowerCase() === "true";
+  return Boolean(nodemailer) && String(process.env.SMTP_ENABLED || "false").toLowerCase() === "true";
 }
 
 function smtpTransportOptions() {
@@ -880,6 +903,7 @@ function smtpTransportOptions() {
 }
 
 function validateSmtpConfig() {
+  if (!nodemailer) return { ok: true, enabled: false, message: "Nodemailer kurulu degil; gonderimler mail log dosyasina yazilir." };
   if (!smtpEnabled()) return { ok: true, enabled: false, message: "SMTP kapalı; gönderimler mail log dosyasına yazılır." };
   const required = ["SMTP_HOST", "SMTP_FROM"];
   const missing = required.filter((key) => !process.env[key]);
@@ -1246,8 +1270,11 @@ async function handleApi(req, res, url) {
             requested: true,
             qty: Number(body.orderRequest.qty || 0),
             reason: body.orderRequest.reason || "",
+            status: body.orderRequest.status || "pending",
+            statusBy: body.orderRequest.statusBy || "",
+            statusAt: body.orderRequest.statusAt || "",
           }
-        : { requested: false, qty: 0, reason: "" },
+        : { requested: false, qty: 0, reason: "", status: "pending" },
       user: user.name,
       username: user.username,
       departmentId: product.departmentId,
