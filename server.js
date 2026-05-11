@@ -439,6 +439,8 @@ function buildDailyReport(db, date, departmentId = "all") {
       departmentName: departmentName(db, product.departmentId),
       unit: product.unit,
       qty,
+      usedQty: Number(count?.usedQty || 0),
+      startingQty: Number.isFinite(Number(count?.startingQty)) ? Number(count.startingQty) : Number(product.lastQty || 0),
       minQty,
       counted: Boolean(count),
       note: count?.note || "",
@@ -466,6 +468,8 @@ function buildDailyReport(db, date, departmentId = "all") {
       departmentName: item.departmentName,
       unit: item.unit,
       qty: item.qty,
+      usedQty: item.usedQty,
+      startingQty: item.startingQty,
       minQty: item.minQty,
       counted: item.counted,
       note: item.note,
@@ -488,6 +492,8 @@ function buildDailyReport(db, date, departmentId = "all") {
       departmentName: item.departmentName,
       unit: item.unit,
       qty: item.qty,
+      usedQty: item.usedQty,
+      startingQty: item.startingQty,
       minQty: item.minQty,
       requestedQty: item.orderRequest.requestedQty,
       reason: item.orderRequest.reason,
@@ -1262,8 +1268,12 @@ async function handleApi(req, res, url) {
     }
     const date = body.date || todayKey();
     db.counts[date] ||= {};
+    const usedQty = Number.isFinite(Number(body.usedQty)) ? Math.max(Number(body.usedQty), 0) : 0;
+    const startingQty = Number.isFinite(Number(body.startingQty)) ? Number(body.startingQty) : Number(product.lastQty || 0);
     db.counts[date][body.productId] = {
       qty: Number(body.qty),
+      usedQty,
+      startingQty,
       note: body.note || "",
       orderRequest: body.orderRequest?.requested
         ? {
@@ -1280,6 +1290,8 @@ async function handleApi(req, res, url) {
       departmentId: product.departmentId,
       time: body.time || timeKey(),
     };
+    product.lastQty = Number(body.qty);
+    product.updatedAt = new Date().toISOString();
     saveDb(db);
     sendJson(res, 200, db.counts[date][body.productId]);
     return;

@@ -347,6 +347,11 @@ tbody tr:hover {
   padding: 0 10px;
 }
 
+.used-input {
+  border-color: #bfd9d3;
+  background: #f7fbfa;
+}
+
 .note-input {
   width: min(180px, 100%);
   min-height: 38px;
@@ -1198,6 +1203,7 @@ tbody tr:hover {
   }
 
   .qty-input,
+  .used-input,
   .note-input,
   .small-input,
   .reason-input {
@@ -1586,6 +1592,7 @@ h2 {
 .field,
 .search,
 .qty-input,
+.used-input,
 .note-input,
 .small-input,
 .reason-input,
@@ -1601,6 +1608,7 @@ h2 {
 .field:focus,
 .search:focus,
 .qty-input:focus,
+.used-input:focus,
 .note-input:focus,
 .small-input:focus,
 .reason-input:focus,

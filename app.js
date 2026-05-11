@@ -1588,6 +1588,16 @@ function productFallbackQty(productId) {
   return existing?.qty ?? product?.lastQty ?? 0;
 }
 
+function usageBaseQty(productId) {
+  const product = state.products.find((item) => item.id === productId);
+  const existing = getTodayCount(productId);
+  if (Number.isFinite(Number(existing?.startingQty))) return Number(existing.startingQty);
+  if (Number.isFinite(Number(existing?.usedQty)) && Number.isFinite(Number(existing?.qty))) {
+    return Number(existing.qty) + Number(existing.usedQty);
+  }
+  return Number(product?.lastQty || 0);
+}
+
 function hasManualOrderRequest(count) {
   return Boolean(count?.orderRequest?.requested);
 }
@@ -1614,11 +1624,16 @@ function orderPriorityLabel(item) {
   return "Planli";
 }
 
-function setTodayCount(productId, qty, note = "", orderRequest = null) {
+function setTodayCount(productId, qty, note = "", orderRequest = null, usage = {}) {
   const product = state.products.find((item) => item.id === productId);
   const date = todayKey();
+  const numericQty = Math.max(Number(qty || 0), 0);
+  const usedQty = Number.isFinite(Number(usage.usedQty)) ? Math.max(Number(usage.usedQty), 0) : 0;
+  const startingQty = Number.isFinite(Number(usage.startingQty)) ? Number(usage.startingQty) : usageBaseQty(productId);
   const entry = {
-    qty: Number(qty),
+    qty: numericQty,
+    usedQty,
+    startingQty,
     note,
     orderRequest,
     user: state.user.name,
@@ -1628,9 +1643,15 @@ function setTodayCount(productId, qty, note = "", orderRequest = null) {
   };
   state.counts[date] ||= {};
   state.counts[date][productId] = entry;
+  if (product) {
+    product.lastQty = numericQty;
+    product.updatedAt = new Date().toISOString();
+  }
   save("hotel-stock-counts", state.counts);
+  save("hotel-stock-products", state.products);
   if (firebaseState.enabled) {
     saveCountToFirebase(date, productId, entry).catch((error) => console.warn("Sayım Firebase'e yazılamadı.", error));
+    saveProductsToFirebase().catch((error) => console.warn("Stok Firebase'e yazılamadı.", error));
   }
   apiRequest("/api/counts", {
     method: "POST",
@@ -2038,6 +2059,8 @@ function renderCounting() {
     .map((product) => {
       const count = getTodayCount(product.id);
       const qty = count?.qty ?? "";
+      const usedQty = count?.usedQty ? formatInputNumber(count.usedQty) : "";
+      const startingQty = count?.startingQty ?? product.lastQty;
       const note = count?.note ?? "";
       const requested = Boolean(count?.orderRequest?.requested);
       const requestQty = count?.orderRequest?.qty ?? "";
@@ -2049,6 +2072,7 @@ function renderCounting() {
           <td data-label="Ürün"><strong>${escapeHtml(product.name)}</strong><br><span class="hint">${departmentName(product.departmentId)}</span></td>
           <td data-label="Birim">${escapeHtml(product.unit)}</td>
           <td data-label="Önceki">${product.lastQty}</td>
+          <td data-label="Bugun Kullanilan"><input class="qty-input used-input" type="number" min="0" step="0.01" value="${usedQty}" placeholder="Kullanilan" data-used="${product.id}" /></td>
           <td data-label="Minimum">${product.minQty}</td>
           <td data-label="Bugünkü Sayım"><input class="qty-input" type="number" min="0" step="0.01" value="${qty}" data-count="${product.id}" /></td>
           <td data-label="Not"><input class="note-input" value="${escapeHtml(note)}" placeholder="Not" data-note="${product.id}" /></td>
@@ -2085,12 +2109,11 @@ function renderCounting() {
               <th>Ürün</th>
               <th>Birim</th>
               <th>Önceki</th>
+              <th>Bugun kullanilan</th>
               <th>Minimum</th>
               <th>Bugünkü Sayım</th>
               <th>Not</th>
               <th>Sipariş Talebi</th>
-              <th>Oncelik</th>
-              <th>Onay</th>
               <th>Kaydeden</th>
               <th>Durum</th>
             </tr>
@@ -2258,6 +2281,7 @@ function reportIssueRows(snapshot, type) {
       product: product.name,
       unit: product.unit,
       current: `${formatReportNumber(qty)} ${product.unit}`,
+      usedQty: count?.usedQty ? `${formatReportNumber(count.usedQty)} ${product.unit}` : "",
       minimum: `${formatReportNumber(product.minQty)} ${product.unit}`,
       actionQty: type === "critical" ? suggestedQty : requestQty || "Miktar belirtilmedi",
       reason: type === "critical" ? (count?.note || "Minimum stok seviyesinin altında") : (request.reason || count?.note || "Manuel satın alma talebi"),
@@ -2284,6 +2308,7 @@ function renderReportIssueSection(type, snapshot) {
       <td data-label="Departman">${escapeHtml(row.department)}</td>
       <td data-label="Ürün"><strong>${escapeHtml(row.product)}</strong></td>
       <td data-label="Mevcut">${escapeHtml(row.current)}</td>
+      <td data-label="Bugun Kullanilan">${escapeHtml(row.usedQty || "-")}</td>
       <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
       <td data-label="${qtyTitle}">${escapeHtml(row.actionQty)}</td>
       <td data-label="Açıklama">${escapeHtml(row.reason)}</td>
@@ -2309,6 +2334,7 @@ function renderReportIssueSection(type, snapshot) {
               <th>Departman</th>
               <th>Ürün</th>
               <th>Mevcut</th>
+              <th>Bugun kullanilan</th>
               <th>Minimum</th>
               <th>${qtyTitle}</th>
               <th>Açıklama</th>
@@ -2774,6 +2800,7 @@ function renderDetailedReportTable(date = state.reportDate) {
         <td data-label="Urun"><strong>${escapeHtml(row.product)}</strong></td>
         <td data-label="Birim">${escapeHtml(row.unit)}</td>
         <td data-label="Onceki">${escapeHtml(row.previous)}</td>
+        <td data-label="Bugun Kullanilan">${escapeHtml(row.usedQty || "-")}</td>
         <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
         <td data-label="Sayim">${escapeHtml(row.counted || "Girilmedi")}</td>
         <td data-label="Durum"><span class="badge ${row.status === "Kritik" || row.status === "Bekliyor" || row.status === "Siparis Talebi" ? "danger" : "ok"}">${escapeHtml(row.status)}</span></td>
@@ -2798,6 +2825,7 @@ function renderDetailedReportTable(date = state.reportDate) {
               <th>Urun</th>
               <th>Birim</th>
               <th>Onceki</th>
+              <th>Bugun kullanilan</th>
               <th>Minimum</th>
               <th>Sayim</th>
               <th>Durum</th>
@@ -2806,7 +2834,7 @@ function renderDetailedReportTable(date = state.reportDate) {
               <th>Not</th>
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td data-label="Durum" colspan="10" class="empty">Bu rapor filtresinde urun yok.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="11" class="empty">Bu rapor filtresinde urun yok.</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -2884,6 +2912,7 @@ function appendExecutiveMailSection(lines, title, rows, emptyText) {
   rows.forEach((row, index) => {
     lines.push(`${index + 1}. ${row.department} / ${row.product}`);
     lines.push(`   Mevcut: ${row.current} | Minimum: ${row.minimum} | Aksiyon: ${row.actionQty}`);
+    if (row.usedQty) lines.push(`   Bugun kullanilan: ${row.usedQty}`);
     lines.push(`   Açıklama: ${row.reason}`);
     if (row.savedBy || row.savedAt) lines.push(`   Kaydeden: ${row.savedBy}${row.savedAt ? ` - ${row.savedAt}` : ""}`);
   });
@@ -3017,6 +3046,13 @@ function formatReportNumber(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
   return Number.isInteger(numeric) ? String(numeric) : numeric.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+}
+
+function formatInputNumber(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  return Number.isInteger(numeric) ? String(numeric) : String(Number(numeric.toFixed(2)));
 }
 
 function reportFileStem(extension = "") {
@@ -3201,6 +3237,8 @@ function reportProductRows(date = state.reportDate, departmentId = reportDepartm
       product: product.name,
       unit: product.unit,
       previous: formatReportNumber(product.lastQty),
+      startingQty: count ? formatReportNumber(count.startingQty ?? product.lastQty) : formatReportNumber(product.lastQty),
+      usedQty: count?.usedQty ? `${formatReportNumber(count.usedQty)} ${product.unit}` : "",
       minimum: formatReportNumber(product.minQty),
       counted: formatReportNumber(counted),
       status,
@@ -3264,6 +3302,7 @@ function buildExcelIssueTable(title, rows, emptyText) {
         <td>${excelCell(row.department)}</td>
         <td>${excelCell(row.product)}</td>
         <td>${excelCell(row.current)}</td>
+        <td>${excelCell(row.usedQty || "-")}</td>
         <td>${excelCell(row.minimum)}</td>
         <td>${excelCell(row.actionQty)}</td>
         <td>${excelCell(row.reason)}</td>
@@ -3271,7 +3310,7 @@ function buildExcelIssueTable(title, rows, emptyText) {
         <td>${excelCell(row.savedAt)}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="8">${excelCell(emptyText)}</td></tr>`;
+    : `<tr><td colspan="9">${excelCell(emptyText)}</td></tr>`;
 
   return `
     <h3>${excelCell(title)}</h3>
@@ -3433,6 +3472,7 @@ function buildPdfLines() {
     criticalRows.forEach((row, index) => {
       lines.push(`${index + 1}. ${row.department} / ${row.product}`);
       lines.push(`   Mevcut: ${row.current} | Minimum: ${row.minimum} | Aksiyon: ${row.actionQty}`);
+      if (row.usedQty) lines.push(`   Bugun kullanilan: ${row.usedQty}`);
       lines.push(`   Aciklama: ${row.reason}`);
     });
   }
@@ -3444,6 +3484,7 @@ function buildPdfLines() {
     manualRows.forEach((row, index) => {
       lines.push(`${index + 1}. ${row.department} / ${row.product}`);
       lines.push(`   Mevcut: ${row.current} | Talep: ${row.actionQty}`);
+      if (row.usedQty) lines.push(`   Bugun kullanilan: ${row.usedQty}`);
       lines.push(`   Gerekce: ${row.reason}`);
     });
   }
@@ -3563,13 +3604,14 @@ function buildPrintableIssueTable(title, rows, emptyText) {
         <td>${escapeHtml(row.department)}</td>
         <td><strong>${escapeHtml(row.product)}</strong></td>
         <td>${escapeHtml(row.current)}</td>
+        <td>${escapeHtml(row.usedQty || "-")}</td>
         <td>${escapeHtml(row.minimum)}</td>
         <td>${escapeHtml(row.actionQty)}</td>
         <td>${escapeHtml(row.reason)}</td>
         <td>${escapeHtml(row.savedBy)}${row.savedAt ? ` / ${escapeHtml(row.savedAt)}` : ""}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="7">${escapeHtml(emptyText)}</td></tr>`;
+    : `<tr><td colspan="8">${escapeHtml(emptyText)}</td></tr>`;
 
   return `
     <h2>${escapeHtml(title)}</h2>
@@ -4178,13 +4220,14 @@ function exportCsv() {
     ...reportIssueRows(snapshot, "critical").map((row) => ["Kritik stok", row]),
     ...reportIssueRows(snapshot, "manual").map((row) => ["Manuel talep", row]),
   ];
-  const executiveHeader = ["Tarih", "Rapor Bolumu", "Departman", "Urun", "Mevcut", "Minimum", "Aksiyon Miktari", "Aciklama", "Kaydeden", "Saat"];
+  const executiveHeader = ["Tarih", "Rapor Bolumu", "Departman", "Urun", "Mevcut", "Bugun Kullanilan", "Minimum", "Aksiyon Miktari", "Aciklama", "Kaydeden", "Saat"];
   const executiveCsv = [executiveHeader, ...actionRows.map(([section, row]) => [
     state.reportDate,
     section,
     row.department,
     row.product,
     row.current,
+    row.usedQty || "",
     row.minimum,
     row.actionQty,
     row.reason,
@@ -4308,17 +4351,21 @@ app.addEventListener("click", async (event) => {
   if (action === "save-counts") {
     document.querySelectorAll("[data-count]").forEach((input) => {
       const note = document.querySelector(`[data-note="${input.dataset.count}"]`)?.value || "";
+      const usedRaw = document.querySelector(`[data-used="${input.dataset.count}"]`)?.value || "";
+      const hasUsed = String(usedRaw).trim() !== "" && Number.isFinite(Number(usedRaw));
+      const usedQty = hasUsed ? Math.max(Number(usedRaw), 0) : 0;
+      const startingQty = usageBaseQty(input.dataset.count);
       const requestedByCheck = document.querySelector(`[data-order-request="${input.dataset.count}"]`)?.checked || false;
       const orderQty = document.querySelector(`[data-order-qty="${input.dataset.count}"]`)?.value || "";
       const reason = document.querySelector(`[data-order-reason="${input.dataset.count}"]`)?.value || "";
       const requested = requestedByCheck || String(orderQty).trim() !== "" || String(reason).trim() !== "";
-      if (input.value !== "" || requested || note.trim() !== "") {
-        const qty = input.value !== "" ? input.value : productFallbackQty(input.dataset.count);
+      if (input.value !== "" || hasUsed || requested || note.trim() !== "") {
+        const qty = input.value !== "" ? Number(input.value) : Math.max(startingQty - usedQty, 0);
         const existingRequest = getTodayCount(input.dataset.count)?.orderRequest || {};
         const orderRequest = requested
           ? { requested: true, qty: Number(orderQty || 0), reason, status: existingRequest.status || "pending" }
           : { requested: false, qty: 0, reason: "" };
-        setTodayCount(input.dataset.count, qty, note, orderRequest);
+        setTodayCount(input.dataset.count, qty, note, orderRequest, { usedQty, startingQty });
       }
     });
     render();
@@ -4493,6 +4540,15 @@ app.addEventListener("click", async (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  if (event.target.dataset.used) {
+    const productId = event.target.dataset.used;
+    const countInput = document.querySelector(`[data-count="${productId}"]`);
+    const usedValue = Number(event.target.value || 0);
+    if (countInput && Number.isFinite(usedValue)) {
+      countInput.value = formatInputNumber(Math.max(usageBaseQty(productId) - Math.max(usedValue, 0), 0));
+    }
+  }
+
   if (event.target.dataset.action === "search") {
     const selectionStart = event.target.selectionStart;
     const selectionEnd = event.target.selectionEnd;
