@@ -2054,6 +2054,84 @@ function renderDepartmentFilter() {
   return `<select class="field" data-action="department">${all}${options}</select>`;
 }
 
+function stockMovementRows(limit = 40) {
+  const productMap = new Map(visibleProducts({ includeInactive: true }).map((product) => [product.id, product]));
+  const rows = [];
+  const dates = Object.keys(state.counts || {}).sort((a, b) => b.localeCompare(a));
+
+  dates.forEach((date) => {
+    const dayCounts = Object.entries(state.counts[date] || {}).sort(([, a], [, b]) => String(b?.time || "").localeCompare(String(a?.time || "")));
+    dayCounts.forEach(([productId, count]) => {
+      if (rows.length >= limit) return;
+      const product = productMap.get(productId);
+      if (!product || !count) return;
+      const usedQty = Number(count.usedQty || 0);
+      const qty = Number(count.qty || 0);
+      const startingQty = Number.isFinite(Number(count.startingQty)) ? Number(count.startingQty) : qty + usedQty;
+      const requested = hasManualOrderRequest(count);
+      rows.push({
+        date,
+        product,
+        count,
+        startingQty,
+        usedQty,
+        qty,
+        type: usedQty > 0 ? "Kullanım düşümü" : requested ? "Sipariş talebi" : "Sayım güncellemesi",
+        statusClass: qty <= Number(product.minQty || 0) ? "danger" : requested ? "warn" : "ok",
+      });
+    });
+  });
+
+  return rows;
+}
+
+function renderStockMovements() {
+  const movements = stockMovementRows();
+  const rows = movements.map((row) => `
+    <tr>
+      <td data-label="Tarih">${escapeHtml(row.date)}${row.count.time ? `<br><span class="hint">${escapeHtml(row.count.time)}</span>` : ""}</td>
+      <td data-label="Departman">${escapeHtml(departmentName(row.product.departmentId))}</td>
+      <td data-label="Ürün"><strong>${escapeHtml(row.product.name)}</strong><br><span class="hint">${escapeHtml(row.product.unit)}</span></td>
+      <td data-label="İşlem"><span class="badge ${row.statusClass}">${escapeHtml(row.type)}</span></td>
+      <td data-label="Başlangıç">${escapeHtml(formatReportNumber(row.startingQty))}</td>
+      <td data-label="Kullanılan">${row.usedQty > 0 ? `${escapeHtml(formatReportNumber(row.usedQty))} ${escapeHtml(row.product.unit)}` : "-"}</td>
+      <td data-label="Kalan">${escapeHtml(formatReportNumber(row.qty))} ${escapeHtml(row.product.unit)}</td>
+      <td data-label="Kaydeden">${escapeHtml(row.count.user || row.count.username || "Sistem")}</td>
+      <td data-label="Not">${escapeHtml(row.count.note || row.count.orderRequest?.reason || "-")}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <section class="panel movement-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Stok hareketleri</h3>
+          <span class="hint">Son kayıtlar; sayım, günlük kullanım düşümü ve sipariş talepleri denetim izi olarak saklanır.</span>
+        </div>
+        <span class="badge">${movements.length} kayıt</span>
+      </div>
+      <div class="table-wrap movement-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>Departman</th>
+              <th>Ürün</th>
+              <th>İşlem</th>
+              <th>Başlangıç</th>
+              <th>Kullanılan</th>
+              <th>Kalan</th>
+              <th>Kaydeden</th>
+              <th>Not</th>
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="9" class="empty">Henüz stok hareketi yok.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
 function renderCounting() {
   const usedRows = visibleProducts()
     .map((product) => ({ product, count: getTodayCount(product.id) }))
@@ -2146,6 +2224,7 @@ function renderCounting() {
         </table>
       </div>
     </section>
+    ${renderStockMovements()}
   `;
 }
 

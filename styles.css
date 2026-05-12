@@ -434,6 +434,18 @@ tbody tr:hover {
   padding-bottom: 0;
 }
 
+.movement-panel {
+  border-left: 4px solid var(--brand);
+}
+
+.movement-table table {
+  min-width: 980px;
+}
+
+.movement-table td:nth-child(3) {
+  min-width: 190px;
+}
+
 .checkline {
   display: flex;
   gap: 7px;
