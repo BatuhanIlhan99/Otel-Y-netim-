@@ -20,7 +20,7 @@ const defaultUsers = [
 let users = load("hotel-stock-users", defaultUsers);
 
 const foodDepartmentIds = ["gulplaj-restorant", "gulplaj-bufe", "smile-food-house"];
-const stockResetVersion = "2026-05-12-zero-stock-v1";
+const stockResetVersion = "2026-05-12-zero-stock-v2";
 const countingPageSize = 80;
 const productAdminPageSize = 80;
 
@@ -2283,8 +2283,9 @@ function renderCounting() {
     .map((product) => {
       const count = getTodayCount(product.id);
       const qty = count?.qty ?? "";
+      const stockValue = formatInputNumber(count?.qty ?? product.lastQty ?? 0);
       const usedQty = count?.usedQty ? formatInputNumber(count.usedQty) : "";
-      const startingQty = count?.startingQty ?? product.lastQty;
+      const stockBase = formatInputNumber(count?.startingQty ?? count?.qty ?? product.lastQty ?? 0);
       const note = count?.note ?? "";
       const requested = Boolean(count?.orderRequest?.requested);
       const requestQty = count?.orderRequest?.qty ?? "";
@@ -2295,10 +2296,9 @@ function renderCounting() {
         <tr>
           <td data-label="Ürün"><strong>${escapeHtml(product.name)}</strong><br><span class="hint">${departmentName(product.departmentId)}</span></td>
           <td data-label="Birim">${escapeHtml(product.unit)}</td>
-          <td data-label="Başlangıç">${formatReportNumber(startingQty)}</td>
+          <td data-label="Stok"><input class="qty-input stock-input" type="number" min="0" step="0.01" value="${stockValue}" data-count="${product.id}" data-stock-base="${stockBase}" data-original-stock="${stockValue}" /></td>
           <td data-label="Bugün Kullanılan"><input class="qty-input used-input" type="number" min="0" step="0.01" value="${usedQty}" placeholder="Kullanılan" data-used="${product.id}" /></td>
           <td data-label="Minimum">${product.minQty}</td>
-          <td data-label="Bugünkü Sayım"><input class="qty-input" type="number" min="0" step="0.01" value="${qty}" data-count="${product.id}" /></td>
           <td data-label="Not"><input class="note-input" value="${escapeHtml(note)}" placeholder="Not" data-note="${product.id}" /></td>
           <td data-label="Sipariş Talebi">
             <div class="order-request-cell">
@@ -2350,17 +2350,16 @@ function renderCounting() {
             <tr>
               <th>Ürün</th>
               <th>Birim</th>
-              <th>Başlangıç</th>
+              <th>Stok</th>
               <th>Bugün kullanılan</th>
               <th>Minimum</th>
-              <th>Bugünkü Sayım</th>
               <th>Not</th>
               <th>Sipariş Talebi</th>
               <th>Kaydeden</th>
               <th>Durum</th>
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td data-label="Durum" colspan="10" class="empty">Bu filtrede ürün yok.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="9" class="empty">Bu filtrede ürün yok.</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -4028,7 +4027,7 @@ function renderProductsAdmin() {
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Ürün</th><th>Departman</th><th>Birim</th><th>Başlangıç</th><th>Minimum</th><th>Durum</th><th>İşlem</th></tr></thead>
+            <thead><tr><th>Ürün</th><th>Departman</th><th>Birim</th><th>Stok</th><th>Minimum</th><th>Durum</th><th>İşlem</th></tr></thead>
             <tbody>${rows || `<tr><td data-label="Durum" colspan="7" class="empty">Ürün bulunamadı.</td></tr>`}</tbody>
           </table>
         </div>
@@ -4677,12 +4676,13 @@ app.addEventListener("click", async (event) => {
       const usedRaw = document.querySelector(`[data-used="${input.dataset.count}"]`)?.value || "";
       const hasUsed = String(usedRaw).trim() !== "" && Number.isFinite(Number(usedRaw));
       const usedQty = hasUsed ? Math.max(Number(usedRaw), 0) : 0;
-      const startingQty = usageBaseQty(input.dataset.count);
+      const stockChanged = input.value !== "" && Number(input.value) !== Number(input.dataset.originalStock || 0);
+      const startingQty = Number.isFinite(Number(input.dataset.stockBase)) ? Number(input.dataset.stockBase) : usageBaseQty(input.dataset.count);
       const requestedByCheck = document.querySelector(`[data-order-request="${input.dataset.count}"]`)?.checked || false;
       const orderQty = document.querySelector(`[data-order-qty="${input.dataset.count}"]`)?.value || "";
       const reason = document.querySelector(`[data-order-reason="${input.dataset.count}"]`)?.value || "";
       const requested = requestedByCheck || String(orderQty).trim() !== "" || String(reason).trim() !== "";
-      if (input.value !== "" || hasUsed || requested || note.trim() !== "") {
+      if (stockChanged || hasUsed || requested || note.trim() !== "") {
         const qty = input.value !== "" ? Number(input.value) : Math.max(startingQty - usedQty, 0);
         const existingRequest = getTodayCount(input.dataset.count)?.orderRequest || {};
         const orderRequest = requested
@@ -4897,12 +4897,20 @@ app.addEventListener("click", async (event) => {
 });
 
 app.addEventListener("input", (event) => {
+  if (event.target.dataset.count) {
+    event.target.dataset.stockBase = event.target.value;
+    state.saveMessage = "";
+  }
+
   if (event.target.dataset.used) {
     const productId = event.target.dataset.used;
     const countInput = document.querySelector(`[data-count="${productId}"]`);
     const usedValue = Number(event.target.value || 0);
     if (countInput && Number.isFinite(usedValue)) {
-      countInput.value = formatInputNumber(Math.max(usageBaseQty(productId) - Math.max(usedValue, 0), 0));
+      const baseQty = Number.isFinite(Number(countInput.dataset.stockBase))
+        ? Number(countInput.dataset.stockBase)
+        : Number(countInput.value || usageBaseQty(productId));
+      countInput.value = formatInputNumber(Math.max(baseQty - Math.max(usedValue, 0), 0));
     }
   }
 

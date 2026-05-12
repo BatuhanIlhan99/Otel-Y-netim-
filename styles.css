@@ -352,6 +352,12 @@ tbody tr:hover {
   background: #f7fbfa;
 }
 
+.stock-input {
+  border-color: #b8ccc7;
+  background: #ffffff;
+  font-weight: 800;
+}
+
 .note-input {
   width: min(180px, 100%);
   min-height: 38px;
