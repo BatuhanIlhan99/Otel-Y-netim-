@@ -6,7 +6,7 @@ const departments = [
   { id: "resepsiyon", name: "Resepsiyon" },
 ];
 
-const users = [
+const defaultUsers = [
   { username: "admin", password: "admin123", name: "Yönetici", role: "admin", departmentId: "all" },
   { username: "satinalma", password: "SatinAlma2026", name: "Satın Alma Sorumlusu", role: "admin", departmentId: "all" },
   { username: "operasyon", password: "Operasyon2026", name: "Operasyon Müdürü", role: "admin", departmentId: "all" },
@@ -17,7 +17,10 @@ const users = [
   { username: "resepsiyon", password: "Resepsiyon2026", name: "Resepsiyon Kullanıcısı", role: "staff", departmentId: "resepsiyon" },
 ];
 
+let users = load("hotel-stock-users", defaultUsers);
+
 const foodDepartmentIds = ["gulplaj-restorant", "gulplaj-bufe", "smile-food-house"];
+const stockResetVersion = "2026-05-12-zero-stock-v1";
 
 const portionProfiles = {
   "hotel-buffet": {
@@ -1039,7 +1042,7 @@ const seedProducts = [
   name: item[0],
   departmentId: item[1],
   unit: item[2],
-  lastQty: item[3],
+  lastQty: 0,
   minQty: item[4],
   active: true,
 }));
@@ -1084,7 +1087,14 @@ const state = {
 };
 
 state.products = ensureProfessionalProductCatalogs(state.products);
+if (localStorage.getItem("hotel-stock-reset-version") !== stockResetVersion) {
+  state.products = state.products.map((product) => ({ ...product, lastQty: 0, updatedAt: new Date().toISOString() }));
+  state.counts = {};
+  save("hotel-stock-counts", state.counts);
+  localStorage.setItem("hotel-stock-reset-version", stockResetVersion);
+}
 save("hotel-stock-products", state.products);
+save("hotel-stock-users", users);
 
 function todayKey() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1416,6 +1426,13 @@ async function syncFromBackend() {
       state.selectedDepartment = data.user.role === "admin" ? state.selectedDepartment : data.user.departmentId;
       if (!state.view) state.view = data.user.role === "admin" ? "dashboard" : "sayim";
     }
+    if (Array.isArray(data.users)) {
+      users = data.users.map((serverUser) => {
+        const existing = users.find((item) => item.username === serverUser.username);
+        return { ...existing, ...serverUser, password: existing?.password || "" };
+      });
+      save("hotel-stock-users", users);
+    }
     state.products = ensureProfessionalProductCatalogs(data.products || state.products);
     state.counts = data.counts || state.counts;
     state.mailSettings = normalizeMailSettings(data.mailSettings || state.mailSettings);
@@ -1487,7 +1504,7 @@ function ensureProfessionalProductCatalogs(products) {
         name: item[0],
         departmentId: item[1],
         unit: item[2],
-        lastQty: item[3],
+        lastQty: 0,
         minQty: item[4],
         active: true,
       };
@@ -1684,6 +1701,52 @@ function setOrderRequestStatus(productId, status) {
     method: "POST",
     body: JSON.stringify({ date, productId, ...state.counts[date][productId] }),
   }).catch((error) => console.warn("Talep durumu backend'e yazilamadi.", error));
+}
+
+function resetAllStocksLocally() {
+  const now = new Date().toISOString();
+  state.products = state.products.map((product) => ({ ...product, lastQty: 0, updatedAt: now }));
+  state.counts = {};
+  save("hotel-stock-products", state.products);
+  save("hotel-stock-counts", state.counts);
+  localStorage.setItem("hotel-stock-reset-version", stockResetVersion);
+}
+
+async function persistAllStockReset() {
+  resetAllStocksLocally();
+  if (firebaseState.enabled) {
+    await resetFirebaseDemoData();
+    return;
+  }
+  if (backendEnabled) {
+    await apiRequest("/api/products/reset-stock", { method: "POST" });
+  }
+}
+
+async function updateUserSettings(currentUsername, nextUsername, nextPassword) {
+  const index = users.findIndex((user) => user.username === currentUsername);
+  if (index < 0) throw new Error("Kullanıcı bulunamadı.");
+  const username = String(nextUsername || "").trim();
+  if (!username) throw new Error("Kullanıcı adı boş olamaz.");
+  const duplicate = users.some((user, userIndex) => userIndex !== index && user.username === username);
+  if (duplicate) throw new Error("Bu kullanıcı adı zaten kullanılıyor.");
+
+  const previous = users[index];
+  const updated = { ...previous, username };
+  if (String(nextPassword || "").trim()) updated.password = String(nextPassword).trim();
+  users[index] = updated;
+  save("hotel-stock-users", users);
+
+  if (state.user?.username === currentUsername) {
+    state.user = { ...state.user, username };
+  }
+
+  if (backendEnabled) {
+    await apiRequest(`/api/users/${encodeURIComponent(currentUsername)}`, {
+      method: "PUT",
+      body: JSON.stringify({ username, password: String(nextPassword || ""), name: previous.name, role: previous.role, departmentId: previous.departmentId }),
+    });
+  }
 }
 
 function render() {
@@ -4260,12 +4323,53 @@ function renderUsers() {
     .join("");
   return `
     <section class="panel">
-      <div class="panel-head"><h3 class="panel-title">Giriş bilgileri ve yetkiler</h3></div>
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Giriş bilgileri ve yetkiler</h3>
+          <span class="hint">Admin kullanıcı adı ve şifreleri buradan belirler. Backend varsa değişiklik merkezi sisteme yazılır.</span>
+        </div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Departman</th><th>Durum</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Kullanıcı adı ve şifre düzenle</h3>
+          <span class="hint">Şifre alanını boş bırakırsan mevcut şifre korunur.</span>
+        </div>
+      </div>
+      <div class="user-editor-list">
+        ${users.map((user) => `
+          <form class="user-editor-card" data-action="user-settings" data-current-username="${escapeHtml(user.username)}">
+            <div>
+              <strong>${escapeHtml(user.name)}</strong>
+              <span class="hint">${user.role === "admin" ? "Admin" : departmentName(user.departmentId)}</span>
+            </div>
+            <label>
+              <span>Kullanıcı adı</span>
+              <input name="username" autocomplete="off" value="${escapeHtml(user.username)}" />
+            </label>
+            <label>
+              <span>Yeni şifre</span>
+              <input name="password" type="text" autocomplete="new-password" placeholder="${user.password ? escapeHtml(user.password) : "Yeni şifre gir"}" />
+            </label>
+            <button class="btn secondary" type="submit">Kaydet</button>
+          </form>
+        `).join("")}
+      </div>
+    </section>
+    <section class="panel danger-zone">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Stok sıfırlama</h3>
+          <span class="hint">Tüm ürünlerin mevcut stok miktarını 0 yapar ve eski sayım kayıtlarını temizler.</span>
+        </div>
+        <button class="btn warn" data-action="reset-all-stock">Tüm stokları sıfırla</button>
       </div>
     </section>
   `;
@@ -4472,6 +4576,20 @@ app.addEventListener("click", async (event) => {
       }
     });
     render();
+  }
+
+  if (action === "reset-all-stock") {
+    if (state.user?.role !== "admin") return;
+    const confirmed = window.confirm("Tüm stok miktarları 0 yapılacak ve sayım kayıtları temizlenecek. Devam edilsin mi?");
+    if (!confirmed) return;
+    try {
+      await persistAllStockReset();
+      window.alert("Tüm stoklar sıfırlandı.");
+      render();
+    } catch (error) {
+      console.warn("Stok sıfırlama başarısız.", error);
+      window.alert("Stok sıfırlama başarısız oldu. Bağlantıyı kontrol edip tekrar dene.");
+    }
   }
 
   if (action === "copy-report") {
@@ -4799,6 +4917,23 @@ app.addEventListener("submit", async (event) => {
       console.warn("Mail ayarları backend'e yazılamadı.", error);
     }
     render();
+  }
+
+  if (action === "user-settings") {
+    if (state.user?.role !== "admin") return;
+    const formData = new FormData(event.target);
+    try {
+      await updateUserSettings(
+        event.target.dataset.currentUsername,
+        formData.get("username"),
+        formData.get("password")
+      );
+      window.alert("Kullanıcı bilgileri güncellendi.");
+      render();
+    } catch (error) {
+      console.warn("Kullanıcı güncellenemedi.", error);
+      window.alert(error.message || "Kullanıcı güncellenemedi.");
+    }
   }
 });
 

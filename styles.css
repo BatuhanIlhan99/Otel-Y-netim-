@@ -446,6 +446,43 @@ tbody tr:hover {
   min-width: 190px;
 }
 
+.user-editor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.user-editor-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.9fr) minmax(160px, 0.9fr) auto;
+  gap: 12px;
+  align-items: end;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+  padding: 12px;
+}
+
+.user-editor-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.user-editor-card input {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.danger-zone {
+  border-left: 4px solid #b94f3a;
+}
+
 .checkline {
   display: flex;
   gap: 7px;
@@ -1284,6 +1321,10 @@ tbody tr:hover {
 
   .usage-list li {
     display: grid;
+  }
+
+  .user-editor-card {
+    grid-template-columns: 1fr;
   }
 
   .inline-actions {

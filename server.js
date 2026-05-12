@@ -231,8 +231,8 @@ function defaultProducts() {
         id: `${catalog.prefix}-${index + 1}`,
         name: item.name,
         departmentId: item.departmentId,
-        unit: item.unit,
-        lastQty: item.lastQty,
+      unit: item.unit,
+      lastQty: 0,
         minQty: item.minQty,
         active: true,
       });
@@ -1177,11 +1177,58 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  const userMatch = pathname.match(/^\/api\/users\/([^/]+)$/);
+  if (req.method === "PUT" && userMatch) {
+    const adminUser = requireAuth(req, res, ["admin"]);
+    if (!adminUser) return;
+    const currentUsername = decodeURIComponent(userMatch[1]);
+    const body = await parseBody(req);
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "");
+    const index = db.users.findIndex((item) => item.username === currentUsername);
+    if (index < 0) {
+      sendJson(res, 404, { ok: false, message: "Kullanıcı bulunamadı." });
+      return;
+    }
+    if (!username) {
+      sendJson(res, 400, { ok: false, message: "Kullanıcı adı boş olamaz." });
+      return;
+    }
+    if (db.users.some((item, userIndex) => userIndex !== index && item.username === username)) {
+      sendJson(res, 409, { ok: false, message: "Bu kullanıcı adı zaten kullanılıyor." });
+      return;
+    }
+    const existing = db.users[index];
+    db.users[index] = {
+      ...existing,
+      username,
+      name: body.name || existing.name,
+      role: body.role || existing.role,
+      departmentId: body.departmentId || existing.departmentId,
+      ...(password.trim() ? { passwordHash: hashPassword(password.trim()) } : {}),
+    };
+    delete db.users[index].password;
+    saveDb(db);
+    sendJson(res, 200, publicUser(db.users[index]));
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/products") {
     const user = requireAuth(req, res);
     if (!user) return;
     const includeInactive = searchParams.get("includeInactive") === "true";
     sendJson(res, 200, allowedProductsForUser(db, user, includeInactive));
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/products/reset-stock") {
+    const user = requireAuth(req, res, ["admin"]);
+    if (!user) return;
+    const now = new Date().toISOString();
+    db.products = db.products.map((product) => ({ ...product, lastQty: 0, updatedAt: now }));
+    db.counts = {};
+    saveDb(db);
+    sendJson(res, 200, { ok: true, products: db.products.length });
     return;
   }
 
