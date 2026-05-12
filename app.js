@@ -20,7 +20,7 @@ const defaultUsers = [
 let users = load("hotel-stock-users", defaultUsers);
 
 const foodDepartmentIds = ["gulplaj-restorant", "gulplaj-bufe", "smile-food-house"];
-const stockResetVersion = "2026-05-12-zero-stock-v2";
+const stockResetVersion = "2026-05-12-zero-stock-v3";
 const countingPageSize = 80;
 const productAdminPageSize = 80;
 

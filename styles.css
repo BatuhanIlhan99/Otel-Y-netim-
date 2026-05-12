@@ -2047,3 +2047,103 @@ tbody tr:hover {
     min-height: 0;
   }
 }
+
+/* Final typography pass: calmer hotel-operations reading rhythm. */
+:root {
+  --font-sans: "Aptos", "Segoe UI Variable Text", "Segoe UI", "Inter", "SF Pro Text", Arial, sans-serif;
+  --font-display: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", "Inter", Arial, sans-serif;
+  --font-tabular: "Aptos", "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+  font-feature-settings: "liga" 1, "kern" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+.panel-title,
+.brand h1,
+.login-intro h1,
+.command-hero h3,
+.executive-report-brand h3,
+.portion-summary-head h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+.brand h1,
+.login-intro h1,
+.command-hero h3 {
+  font-weight: 850;
+}
+
+h2,
+.panel-title,
+.executive-report-brand h3,
+.portion-summary-head h3 {
+  font-weight: 800;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.52;
+}
+
+td,
+th,
+.badge,
+.hint,
+.mini-btn,
+.btn,
+.filter-pill,
+.pager,
+.stat,
+.usage-metric,
+.mail-preview {
+  letter-spacing: 0;
+}
+
+th {
+  font-weight: 850;
+}
+
+td,
+input,
+select,
+textarea {
+  font-weight: 500;
+}
+
+.qty-input,
+.stock-input,
+.used-input,
+.small-input,
+.stat strong,
+.usage-metric strong {
+  font-family: var(--font-tabular);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn,
+.mini-btn,
+.filter-pill,
+.badge,
+.nav button,
+.logout {
+  font-weight: 800;
+}
+
+.mail-preview,
+.executive-mail-preview {
+  font-family: var(--font-sans);
+  line-height: 1.58;
+}
