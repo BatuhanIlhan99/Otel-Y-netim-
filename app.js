@@ -2055,6 +2055,16 @@ function renderDepartmentFilter() {
 }
 
 function renderCounting() {
+  const usedRows = visibleProducts()
+    .map((product) => ({ product, count: getTodayCount(product.id) }))
+    .filter(({ count }) => Number(count?.usedQty || 0) > 0);
+  const usageCritical = usedRows.filter(({ product, count }) => Number(count.qty || 0) <= Number(product.minQty || 0)).length;
+  const usagePreview = usedRows.slice(0, 5).map(({ product, count }) => `
+    <li>
+      <strong>${escapeHtml(product.name)}</strong>
+      <span>${escapeHtml(formatReportNumber(count.usedQty))} ${escapeHtml(product.unit)} kullanildi, kalan ${escapeHtml(formatReportNumber(count.qty))}</span>
+    </li>
+  `).join("");
   const rows = visibleProducts()
     .map((product) => {
       const count = getTodayCount(product.id);
@@ -2071,8 +2081,8 @@ function renderCounting() {
         <tr>
           <td data-label="Ürün"><strong>${escapeHtml(product.name)}</strong><br><span class="hint">${departmentName(product.departmentId)}</span></td>
           <td data-label="Birim">${escapeHtml(product.unit)}</td>
-          <td data-label="Önceki">${product.lastQty}</td>
-          <td data-label="Bugun Kullanilan"><input class="qty-input used-input" type="number" min="0" step="0.01" value="${usedQty}" placeholder="Kullanilan" data-used="${product.id}" /></td>
+          <td data-label="Başlangıç">${formatReportNumber(startingQty)}</td>
+          <td data-label="Bugün Kullanılan"><input class="qty-input used-input" type="number" min="0" step="0.01" value="${usedQty}" placeholder="Kullanılan" data-used="${product.id}" /></td>
           <td data-label="Minimum">${product.minQty}</td>
           <td data-label="Bugünkü Sayım"><input class="qty-input" type="number" min="0" step="0.01" value="${qty}" data-count="${product.id}" /></td>
           <td data-label="Not"><input class="note-input" value="${escapeHtml(note)}" placeholder="Not" data-note="${product.id}" /></td>
@@ -2092,6 +2102,20 @@ function renderCounting() {
 
   return `
     ${renderStats()}
+    <section class="panel usage-overview">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Bugunku kullanim ozeti</h3>
+          <span class="hint">Departmanlar tum stogu saymadan yalnizca gunluk tuketimi girerek kalan stogu dusurebilir.</span>
+        </div>
+        <span class="badge ${usedRows.length ? "warn" : "ok"}">${usedRows.length} kalem</span>
+      </div>
+      <div class="usage-overview-grid">
+        <div class="usage-metric"><strong>${usedRows.length}</strong><span>Kullanim girilen urun</span></div>
+        <div class="usage-metric"><strong>${usageCritical}</strong><span>Kullanim sonrasi kritik</span></div>
+        <ul class="usage-list">${usagePreview || `<li><span>Bugun henuz kullanim girilmedi.</span></li>`}</ul>
+      </div>
+    </section>
     <section class="panel">
       <div class="panel-head">
         <h3 class="panel-title">Sayım listesi</h3>
@@ -2108,8 +2132,8 @@ function renderCounting() {
             <tr>
               <th>Ürün</th>
               <th>Birim</th>
-              <th>Önceki</th>
-              <th>Bugun kullanilan</th>
+              <th>Başlangıç</th>
+              <th>Bugün kullanılan</th>
               <th>Minimum</th>
               <th>Bugünkü Sayım</th>
               <th>Not</th>
@@ -2118,7 +2142,7 @@ function renderCounting() {
               <th>Durum</th>
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td data-label="Durum" colspan="9" class="empty">Bu filtrede ürün yok.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td data-label="Durum" colspan="10" class="empty">Bu filtrede ürün yok.</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -2308,7 +2332,7 @@ function renderReportIssueSection(type, snapshot) {
       <td data-label="Departman">${escapeHtml(row.department)}</td>
       <td data-label="Ürün"><strong>${escapeHtml(row.product)}</strong></td>
       <td data-label="Mevcut">${escapeHtml(row.current)}</td>
-      <td data-label="Bugun Kullanilan">${escapeHtml(row.usedQty || "-")}</td>
+      <td data-label="Bugün Kullanılan">${escapeHtml(row.usedQty || "-")}</td>
       <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
       <td data-label="${qtyTitle}">${escapeHtml(row.actionQty)}</td>
       <td data-label="Açıklama">${escapeHtml(row.reason)}</td>
@@ -2334,7 +2358,7 @@ function renderReportIssueSection(type, snapshot) {
               <th>Departman</th>
               <th>Ürün</th>
               <th>Mevcut</th>
-              <th>Bugun kullanilan</th>
+              <th>Bugün kullanılan</th>
               <th>Minimum</th>
               <th>${qtyTitle}</th>
               <th>Açıklama</th>
@@ -2343,7 +2367,7 @@ function renderReportIssueSection(type, snapshot) {
               <th>Kaydeden</th>
             </tr>
           </thead>
-          <tbody>${body || `<tr><td data-label="Durum" colspan="9" class="empty">Bu bölümde raporlanacak ürün yok.</td></tr>`}</tbody>
+          <tbody>${body || `<tr><td data-label="Durum" colspan="10" class="empty">Bu bölümde raporlanacak ürün yok.</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -2800,7 +2824,7 @@ function renderDetailedReportTable(date = state.reportDate) {
         <td data-label="Urun"><strong>${escapeHtml(row.product)}</strong></td>
         <td data-label="Birim">${escapeHtml(row.unit)}</td>
         <td data-label="Onceki">${escapeHtml(row.previous)}</td>
-        <td data-label="Bugun Kullanilan">${escapeHtml(row.usedQty || "-")}</td>
+        <td data-label="Bugün Kullanılan">${escapeHtml(row.usedQty || "-")}</td>
         <td data-label="Minimum">${escapeHtml(row.minimum)}</td>
         <td data-label="Sayim">${escapeHtml(row.counted || "Girilmedi")}</td>
         <td data-label="Durum"><span class="badge ${row.status === "Kritik" || row.status === "Bekliyor" || row.status === "Siparis Talebi" ? "danger" : "ok"}">${escapeHtml(row.status)}</span></td>
@@ -2825,7 +2849,7 @@ function renderDetailedReportTable(date = state.reportDate) {
               <th>Urun</th>
               <th>Birim</th>
               <th>Onceki</th>
-              <th>Bugun kullanilan</th>
+              <th>Bugün kullanılan</th>
               <th>Minimum</th>
               <th>Sayim</th>
               <th>Durum</th>
@@ -3315,7 +3339,7 @@ function buildExcelIssueTable(title, rows, emptyText) {
   return `
     <h3>${excelCell(title)}</h3>
     <table>
-      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>Aksiyon miktarı</th><th>Açıklama</th><th>Kaydeden</th><th>Saat</th></tr></thead>
+      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Bugün kullanılan</th><th>Minimum</th><th>Aksiyon miktarı</th><th>Açıklama</th><th>Kaydeden</th><th>Saat</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
   `;
@@ -3616,7 +3640,7 @@ function buildPrintableIssueTable(title, rows, emptyText) {
   return `
     <h2>${escapeHtml(title)}</h2>
     <table>
-      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Minimum</th><th>Aksiyon</th><th>Açıklama</th><th>Kaydeden</th></tr></thead>
+      <thead><tr><th>Departman</th><th>Ürün</th><th>Mevcut</th><th>Bugün kullanılan</th><th>Minimum</th><th>Aksiyon</th><th>Açıklama</th><th>Kaydeden</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
   `;

@@ -382,6 +382,58 @@ tbody tr:hover {
   min-width: 160px;
 }
 
+.usage-overview {
+  border-left: 4px solid var(--accent);
+}
+
+.usage-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(260px, 1.6fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.usage-metric,
+.usage-list {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+  padding: 14px;
+}
+
+.usage-metric strong {
+  display: block;
+  font-size: 28px;
+  color: var(--brand);
+  line-height: 1;
+}
+
+.usage-metric span,
+.usage-list span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.usage-list {
+  margin: 0;
+  list-style: none;
+  display: grid;
+  gap: 9px;
+}
+
+.usage-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #edf1f0;
+  padding-bottom: 8px;
+}
+
+.usage-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .checkline {
   display: flex;
   gap: 7px;
@@ -1212,6 +1264,14 @@ tbody tr:hover {
 
   .order-request-cell {
     width: 100%;
+  }
+
+  .usage-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-list li {
+    display: grid;
   }
 
   .inline-actions {
