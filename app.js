@@ -1093,14 +1093,24 @@ const state = {
 };
 
 state.products = ensureProfessionalProductCatalogs(state.products);
-if (localStorage.getItem("hotel-stock-reset-version") !== stockResetVersion) {
+save("hotel-stock-products", state.products);
+save("hotel-stock-users", users);
+
+// #15: Eski sürümde stockReset ilk script yüklemesinde anında çalışıyor ve tüm stokları 0'a indiriyor;
+// kullanıcı sync gelmeden 0'lı ekranı görüp panik yapıp yeniden sayım girebiliyordu.
+// Artık reset yalnızca: (a) kullanıcı giriş yapmış, (b) backend sync denenmiş — sonra uygulanır.
+let stockResetApplied = localStorage.getItem("hotel-stock-reset-version") === stockResetVersion;
+
+function applyStockResetIfNeeded() {
+  if (stockResetApplied) return;
+  if (!state.user) return; // henüz login yok — reset'i ertele
   state.products = state.products.map((product) => ({ ...product, lastQty: 0, updatedAt: new Date().toISOString() }));
   state.counts = {};
   save("hotel-stock-counts", state.counts);
+  save("hotel-stock-products", state.products);
   localStorage.setItem("hotel-stock-reset-version", stockResetVersion);
+  stockResetApplied = true;
 }
-save("hotel-stock-products", state.products);
-save("hotel-stock-users", users);
 
 function todayKey() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1425,6 +1435,9 @@ async function syncFromBackend() {
   }
   if (!state.sessionToken) return;
   try {
+    // #6: önce yerel pending kayıtları backend'e iletmeyi dene
+    await drainPendingCounts();
+
     const data = await apiRequest("/api/bootstrap");
     if (!data) return;
     if (data.user) {
@@ -1433,23 +1446,81 @@ async function syncFromBackend() {
       if (!state.view) state.view = data.user.role === "admin" ? "dashboard" : "sayim";
     }
     if (Array.isArray(data.users)) {
+      // #14: mevcut password alanını ezme — sadece backend'in dönmediği alanları doldur, password local'de kalsın
       users = data.users.map((serverUser) => {
         const existing = users.find((item) => item.username === serverUser.username);
-        return { ...existing, ...serverUser, password: existing?.password || "" };
+        const merged = { ...(existing || {}), ...serverUser };
+        if (existing && existing.password && !serverUser.password) {
+          merged.password = existing.password;
+        }
+        return merged;
       });
       save("hotel-stock-users", users);
     }
     state.products = ensureProfessionalProductCatalogs(data.products || state.products);
-    state.counts = data.counts || state.counts;
+
+    // #6: counts merge — backend boş döndüğünde yerel kayıtları EZME
+    const serverCounts = data.counts && typeof data.counts === "object" ? data.counts : {};
+    const localCounts = state.counts && typeof state.counts === "object" ? state.counts : {};
+    const mergedCounts = { ...localCounts };
+    Object.keys(serverCounts).forEach((date) => {
+      const serverDay = serverCounts[date] || {};
+      const localDay = mergedCounts[date] || {};
+      // ürün bazında server kazanır; ama server'da olmayan local kayıtlar (pending sync) korunur
+      mergedCounts[date] = { ...localDay, ...serverDay };
+    });
+    state.counts = mergedCounts;
+
     state.mailSettings = normalizeMailSettings(data.mailSettings || state.mailSettings);
     save("hotel-stock-products", state.products);
     save("hotel-stock-counts", state.counts);
     save("hotel-stock-mail-settings", state.mailSettings);
     await refreshMailStatus(false);
+    // #15: backend sync tamamlandıktan sonra (kullanıcı login ise) reset uygulanır
+    applyStockResetIfNeeded();
     render();
   } catch (error) {
     console.warn("Backend bağlantısı kurulamadı, yerel demo modu kullanılacak.", error);
   }
+}
+
+// #6: backend'e yazılamayan sayımları kuyruğa al ve sonraki sync'te yeniden gönder
+function queuePendingCount(payload) {
+  try {
+    const raw = localStorage.getItem("hotel-stock-pending-counts");
+    const queue = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(queue)) {
+      localStorage.setItem("hotel-stock-pending-counts", JSON.stringify([payload]));
+      return;
+    }
+    // aynı (date, productId) için sadece en yeni kaydı tut
+    const dedup = queue.filter((item) => !(item && item.date === payload.date && item.productId === payload.productId));
+    dedup.push(payload);
+    localStorage.setItem("hotel-stock-pending-counts", JSON.stringify(dedup));
+  } catch (error) {
+    console.warn("Pending sayım kuyruğuna yazılamadı.", error);
+  }
+}
+
+async function drainPendingCounts() {
+  if (!state.sessionToken) return;
+  let queue = [];
+  try {
+    const raw = localStorage.getItem("hotel-stock-pending-counts");
+    queue = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(queue) || queue.length === 0) return;
+  } catch {
+    return;
+  }
+  const remaining = [];
+  for (const payload of queue) {
+    try {
+      await apiRequest("/api/counts", { method: "POST", body: JSON.stringify(payload) });
+    } catch (error) {
+      remaining.push(payload);
+    }
+  }
+  localStorage.setItem("hotel-stock-pending-counts", JSON.stringify(remaining));
 }
 
 async function refreshMailStatus(renderAfter = false) {
@@ -1584,6 +1655,12 @@ function visibleDepartments() {
     : departments.filter((department) => department.id === state.user.departmentId);
 }
 
+// #12: pasif ürün filtre tutarlılığı — `active === false` ise pasif, diğer her şey (true/undefined/null) aktif sayılır.
+// Eski JSON kayıtlarında `active` alanı eksik olan ürünler artık frontend tarafında da aktif sayılır.
+function isProductActive(product) {
+  return !product || product.active !== false;
+}
+
 function visibleProducts({ includeInactive = false } = {}) {
   const allowedIds = visibleDepartments().map((department) => department.id);
   return state.products.filter((product) => {
@@ -1592,7 +1669,7 @@ function visibleProducts({ includeInactive = false } = {}) {
         ? allowedIds.includes(product.departmentId)
         : product.departmentId === state.selectedDepartment;
     const inSearch = product.name.toLocaleLowerCase("tr").includes(state.search.toLocaleLowerCase("tr"));
-    const activeMatch = includeInactive || product.active;
+    const activeMatch = includeInactive || isProductActive(product);
     return activeMatch && inDepartment && inSearch;
   });
 }
@@ -1720,6 +1797,8 @@ function setTodayCount(productId, qty, note = "", orderRequest = null, usage = {
     qty: numericQty,
     usedQty,
     startingQty,
+    // #11: birim snapshot — kayıt yaratıldığı andaki ürün birimini sakla
+    unit: product?.unit || "",
     note,
     orderRequest,
     user: state.user.name,
@@ -1739,10 +1818,14 @@ function setTodayCount(productId, qty, note = "", orderRequest = null, usage = {
     saveCountToFirebase(date, productId, entry).catch((error) => console.warn("Sayım Firebase'e yazılamadı.", error));
     saveProductsToFirebase().catch((error) => console.warn("Stok Firebase'e yazılamadı.", error));
   }
+  const countPayload = { date, productId, ...entry };
   apiRequest("/api/counts", {
     method: "POST",
-    body: JSON.stringify({ date, productId, ...entry }),
-  }).catch((error) => console.warn("Sayım backend'e yazılamadı.", error));
+    body: JSON.stringify(countPayload),
+  }).catch((error) => {
+    console.warn("Sayım backend'e yazılamadı, kuyruğa alındı.", error);
+    queuePendingCount(countPayload);
+  });
 }
 
 function setOrderRequestStatus(productId, status) {
@@ -1766,10 +1849,14 @@ function setOrderRequestStatus(productId, status) {
   if (firebaseState.enabled) {
     saveCountToFirebase(date, productId, state.counts[date][productId]).catch((error) => console.warn("Talep durumu Firebase'e yazilamadi.", error));
   }
+  const requestPayload = { date, productId, ...state.counts[date][productId] };
   apiRequest("/api/counts", {
     method: "POST",
-    body: JSON.stringify({ date, productId, ...state.counts[date][productId] }),
-  }).catch((error) => console.warn("Talep durumu backend'e yazilamadi.", error));
+    body: JSON.stringify(requestPayload),
+  }).catch((error) => {
+    console.warn("Talep durumu backend'e yazilamadi, kuyruğa alındı.", error);
+    queuePendingCount(requestPayload);
+  });
 }
 
 function resetAllStocksLocally() {
@@ -1790,6 +1877,47 @@ async function persistAllStockReset() {
   if (backendEnabled) {
     await apiRequest("/api/products/reset-stock", { method: "POST" });
   }
+}
+
+// #13: Yeni kullanıcı oluştur (backend varsa merkezi, yoksa yerel)
+async function createUserAccount({ name, username, password, role, departmentId }) {
+  username = String(username || "").trim();
+  password = String(password || "").trim();
+  name = String(name || username).trim();
+  role = role === "admin" ? "admin" : "staff";
+  departmentId = String(departmentId || "").trim();
+  if (!username) throw new Error("Kullanıcı adı boş olamaz.");
+  if (!password) throw new Error("Şifre boş olamaz.");
+  if (role === "staff" && !departmentId) throw new Error("Personel için departman zorunlu.");
+  if (users.some((u) => u.username === username)) throw new Error("Bu kullanıcı adı zaten kullanılıyor.");
+
+  if (backendEnabled) {
+    await apiRequest("/api/users", {
+      method: "POST",
+      body: JSON.stringify({ name, username, password, role, departmentId }),
+    });
+    // syncFromBackend bir sonraki çağrıda users listesini güncelleyecek; şimdilik local'e de ekle
+  }
+  users.push({ name, username, password, role, departmentId });
+  save("hotel-stock-users", users);
+}
+
+// #13: Kullanıcı sil (backend varsa merkezi, yoksa yerel)
+async function deleteUserAccount(targetUsername) {
+  targetUsername = String(targetUsername || "").trim();
+  if (!targetUsername) throw new Error("Kullanıcı bulunamadı.");
+  if (state.user?.username === targetUsername) throw new Error("Kendi hesabını silemezsin.");
+  const index = users.findIndex((u) => u.username === targetUsername);
+  if (index < 0) throw new Error("Kullanıcı bulunamadı.");
+  const target = users[index];
+  if (target.role === "admin" && users.filter((u) => u.role === "admin").length <= 1) {
+    throw new Error("Sistemde en az bir admin olmalı.");
+  }
+  if (backendEnabled) {
+    await apiRequest(`/api/users/${encodeURIComponent(targetUsername)}`, { method: "DELETE" });
+  }
+  users.splice(index, 1);
+  save("hotel-stock-users", users);
 }
 
 async function updateUserSettings(currentUsername, nextUsername, nextPassword) {
@@ -1953,7 +2081,7 @@ function renderView() {
 }
 
 function renderDashboardPro() {
-  const activeProducts = state.products.filter((product) => product.active);
+  const activeProducts = state.products.filter((product) => isProductActive(product));
   const snapshot = buildDailyReportSnapshot(todayKey(), "all");
   const portionSnapshot = buildPortionAnalysisSnapshot({ ...state.portionSettings, date: todayKey() });
   const countedProducts = snapshot.productStates.length - snapshot.notCounted.length;
@@ -2077,7 +2205,7 @@ function renderDashboardPro() {
 }
 
 function renderDashboard() {
-  const activeProducts = state.products.filter((product) => product.active);
+  const activeProducts = state.products.filter((product) => isProductActive(product));
   const criticalItems = activeProducts
     .map((product) => {
       const count = getTodayCount(product.id);
@@ -2808,7 +2936,7 @@ function buildPortionAnalysisSnapshot(settings = state.portionSettings) {
   const profile = portionProfiles[normalized.profileId] || portionProfiles["hotel-buffet"];
   const departmentIds = normalized.departmentId === "all-food" ? foodDepartmentIds : [normalized.departmentId];
   const products = state.products
-    .filter((product) => product.active && departmentIds.includes(product.departmentId));
+    .filter((product) => isProductActive(product) && departmentIds.includes(product.departmentId));
   const rows = products
     .map((product) => buildPortionProductAnalysis(product, normalized, profile))
     .filter(Boolean);
@@ -3092,7 +3220,7 @@ function reportRows(date = state.reportDate) {
   return visibleDepartments()
     .filter((department) => state.selectedDepartment === "all" || department.id === state.selectedDepartment)
     .map((department) => {
-      const products = state.products.filter((product) => product.departmentId === department.id && product.active);
+      const products = state.products.filter((product) => product.departmentId === department.id && isProductActive(product));
       const counted = products.filter((product) => getCount(product.id, date)).length;
       const critical = products.filter((product) => {
         const count = getCount(product.id, date);
@@ -3115,7 +3243,7 @@ function reportRows(date = state.reportDate) {
 function buildDailyReportSnapshot(date = state.reportDate, departmentId = state.selectedDepartment) {
   const departmentList = visibleDepartments().filter((department) => departmentId === "all" || department.id === departmentId);
   const productStates = state.products
-    .filter((product) => product.active)
+    .filter((product) => isProductActive(product))
     .filter((product) => departmentId === "all" || product.departmentId === departmentId)
     .map((product) => {
       const count = getCount(product.id, date);
@@ -3195,7 +3323,6 @@ function buildExecutiveMailReport() {
 }
 
 function buildMailReport() {
-  return buildExecutiveMailReport();
   const snapshot = buildDailyReportSnapshot();
   const lines = [
     state.mailSettings.report.subject,
@@ -4001,11 +4128,11 @@ function renderProductsAdmin() {
         <td data-label="Birim">${escapeHtml(product.unit)}</td>
         <td data-label="Mevcut">${product.lastQty}</td>
         <td data-label="Minimum">${product.minQty}</td>
-        <td data-label="Durum"><span class="badge ${product.active ? "ok" : "danger"}">${product.active ? "Aktif" : "Pasif"}</span></td>
+        <td data-label="Durum"><span class="badge ${isProductActive(product) ? "ok" : "danger"}">${isProductActive(product) ? "Aktif" : "Pasif"}</span></td>
         <td data-label="İşlem">
           <div class="inline-actions">
             <button class="mini-btn" data-action="edit-product" data-id="${product.id}">Düzenle</button>
-            <button class="mini-btn" data-action="toggle-product" data-id="${product.id}">${product.active ? "Pasifleştir" : "Aktifleştir"}</button>
+            <button class="mini-btn" data-action="toggle-product" data-id="${product.id}">${isProductActive(product) ? "Pasifleştir" : "Aktifleştir"}</button>
           </div>
         </td>
       </tr>
@@ -4077,7 +4204,7 @@ function renderDepartmentStockForms(editingProduct) {
 }
 
 function renderDepartmentStockSection(department, open) {
-  const productCount = state.products.filter((product) => product.departmentId === department.id && product.active).length;
+  const productCount = state.products.filter((product) => product.departmentId === department.id && isProductActive(product)).length;
   return `
     <details class="stock-section" ${open ? "open" : ""}>
       <summary>
@@ -4413,15 +4540,28 @@ function renderMailSettings() {
 }
 
 function renderUsers() {
+  const currentUsername = state.user?.username || "";
   const rows = users
-    .map((user) => `
+    .map((user) => {
+      const isSelf = user.username === currentUsername;
+      const isLastAdmin = user.role === "admin" && users.filter((u) => u.role === "admin").length <= 1;
+      const canDelete = !isSelf && !isLastAdmin;
+      const deleteBtn = canDelete
+        ? `<button class="mini-btn danger" data-action="delete-user" data-username="${escapeHtml(user.username)}" data-name="${escapeHtml(user.name)}">Sil</button>`
+        : `<span class="hint">${isSelf ? "Kendin" : "Son admin"}</span>`;
+      return `
       <tr>
         <td data-label="Kullanıcı"><strong>${escapeHtml(user.name)}</strong><br><span class="hint">${escapeHtml(user.username)}</span></td>
         <td data-label="Rol">${user.role === "admin" ? "Admin" : "Personel"}</td>
         <td data-label="Departman">${departmentName(user.departmentId)}</td>
         <td data-label="Durum"><span class="badge ok">Aktif</span></td>
+        <td data-label="İşlem">${deleteBtn}</td>
       </tr>
-    `)
+    `;
+    })
+    .join("");
+  const departmentOptions = departments
+    .map((dept) => `<option value="${escapeHtml(dept.id)}">${escapeHtml(dept.name)}</option>`)
     .join("");
   return `
     <section class="panel">
@@ -4433,10 +4573,38 @@ function renderUsers() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Departman</th><th>Durum</th></tr></thead>
+          <thead><tr><th>Kullanıcı</th><th>Rol</th><th>Departman</th><th>Durum</th><th>İşlem</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Yeni kullanıcı ekle</h3>
+          <span class="hint">Backend bağlıyken yeni kullanıcılar merkezi olarak kaydedilir. Personel için departman seçimi zorunludur.</span>
+        </div>
+      </div>
+      <form class="user-create-form" data-action="user-create" autocomplete="off">
+        <label><span>Ad Soyad</span><input name="name" required /></label>
+        <label><span>Kullanıcı adı</span><input name="username" autocomplete="off" required /></label>
+        <label><span>Şifre</span><input name="password" type="text" autocomplete="new-password" required /></label>
+        <label>
+          <span>Rol</span>
+          <select name="role">
+            <option value="staff">Personel</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <label>
+          <span>Departman</span>
+          <select name="departmentId">
+            <option value="">— (admin için isteğe bağlı) —</option>
+            ${departmentOptions}
+          </select>
+        </label>
+        <button class="btn primary" type="submit">Kullanıcı oluştur</button>
+      </form>
     </section>
     <section class="panel">
       <div class="panel-head">
@@ -4530,7 +4698,7 @@ function exportCsv() {
     ...reportIssueRows(snapshot, "manual").map((row) => ["Manuel talep", row]),
   ];
   const executiveHeader = ["Tarih", "Rapor Bolumu", "Departman", "Urun", "Mevcut", "Bugun Kullanilan", "Minimum", "Aksiyon Miktari", "Aciklama", "Kaydeden", "Saat"];
-  const executiveCsv = [executiveHeader, ...actionRows.map(([section, row]) => [
+  const executiveLines = [executiveHeader, ...actionRows.map(([section, row]) => [
     state.reportDate,
     section,
     row.department,
@@ -4542,13 +4710,10 @@ function exportCsv() {
     row.reason,
     row.savedBy,
     row.savedAt,
-  ])]
-    .map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
-    .join("\n");
-  downloadBlob(new Blob([`\ufeff${executiveCsv}`], { type: "text/csv;charset=utf-8" }), reportFileStem(".csv"));
-  return;
-  const header = ["Tarih", "Departman", "Ürün", "Birim", "Önceki", "Minimum", "Sayım", "Durum", "Kaydeden", "Saat", "Not", "Manuel Sipariş", "Talep Miktarı", "Talep Gerekçesi"];
-  const rows = visibleProducts().map((product) => {
+  ])];
+
+  const detailHeader = ["Tarih", "Departman", "Ürün", "Birim", "Önceki", "Minimum", "Sayım", "Durum", "Kaydeden", "Saat", "Not", "Manuel Sipariş", "Talep Miktarı", "Talep Gerekçesi"];
+  const detailRows = visibleProducts().map((product) => {
     const count = getCount(product.id, state.reportDate);
     const qty = count?.qty ?? "";
     const status = count ? (hasManualOrderRequest(count) ? "Siparis Talebi" : count.qty <= product.minQty ? "Kritik" : "Yeterli") : "Bekliyor";
@@ -4570,16 +4735,22 @@ function exportCsv() {
     ];
   });
 
-  const csv = [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
+  const padRow = (row, width) => row.concat(Array(Math.max(0, width - row.length)).fill(""));
+  const width = Math.max(executiveLines[0].length, detailHeader.length);
+  const sectionBreak = padRow([""], width);
+  const combined = [
+    padRow(["AKSIYON OZETI"], width),
+    ...executiveLines.map((row) => padRow(row, width)),
+    sectionBreak,
+    padRow(["TUM STOK DETAYI"], width),
+    padRow(detailHeader, width),
+    ...detailRows.map((row) => padRow(row, width)),
+  ];
+
+  const csv = combined
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(";"))
     .join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `stok-raporu-${state.reportDate}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }), reportFileStem(".csv"));
 }
 
 async function copyText(text) {
@@ -4672,23 +4843,51 @@ app.addEventListener("click", async (event) => {
   if (action === "save-counts") {
     let savedCount = 0;
     document.querySelectorAll("[data-count]").forEach((input) => {
-      const note = document.querySelector(`[data-note="${input.dataset.count}"]`)?.value || "";
-      const usedRaw = document.querySelector(`[data-used="${input.dataset.count}"]`)?.value || "";
-      const hasUsed = String(usedRaw).trim() !== "" && Number.isFinite(Number(usedRaw));
-      const usedQty = hasUsed ? Math.max(Number(usedRaw), 0) : 0;
+      const productId = input.dataset.count;
+      const existing = getTodayCount(productId);
+      const noteEl = document.querySelector(`[data-note="${productId}"]`);
+      const noteProvided = !!noteEl;
+      const note = noteProvided ? (noteEl.value || "") : (existing?.note || "");
+
+      const usedEl = document.querySelector(`[data-used="${productId}"]`);
+      const usedRaw = usedEl ? usedEl.value : "";
+      const usedProvided = String(usedRaw).trim() !== "" && Number.isFinite(Number(usedRaw));
+      // #4 koruma: kullanım inputu boş bırakılırsa mevcut usedQty'yi koru, sıfırla EZME
+      const usedQty = usedProvided
+        ? Math.max(Number(usedRaw), 0)
+        : (Number.isFinite(Number(existing?.usedQty)) ? Number(existing.usedQty) : 0);
+
       const stockChanged = input.value !== "" && Number(input.value) !== Number(input.dataset.originalStock || 0);
-      const startingQty = Number.isFinite(Number(input.dataset.stockBase)) ? Number(input.dataset.stockBase) : usageBaseQty(input.dataset.count);
-      const requestedByCheck = document.querySelector(`[data-order-request="${input.dataset.count}"]`)?.checked || false;
-      const orderQty = document.querySelector(`[data-order-qty="${input.dataset.count}"]`)?.value || "";
-      const reason = document.querySelector(`[data-order-reason="${input.dataset.count}"]`)?.value || "";
-      const requested = requestedByCheck || String(orderQty).trim() !== "" || String(reason).trim() !== "";
-      if (stockChanged || hasUsed || requested || note.trim() !== "") {
+
+      // #5 koruma: stockBase ilk render'daki "başlangıç miktarı"ndan geliyor; input event'i overwrite etse bile
+      // gerçek başlangıç için existing.startingQty veya orijinal data-original-stock'u tercih et
+      const baseFromExisting = Number.isFinite(Number(existing?.startingQty)) ? Number(existing.startingQty) : null;
+      const baseFromOriginal = Number.isFinite(Number(input.dataset.originalStock)) ? Number(input.dataset.originalStock) : null;
+      const baseFromBase = Number.isFinite(Number(input.dataset.stockBase)) ? Number(input.dataset.stockBase) : null;
+      const startingQty = baseFromExisting ?? baseFromOriginal ?? baseFromBase ?? usageBaseQty(productId);
+
+      const requestCheckbox = document.querySelector(`[data-order-request="${productId}"]`);
+      const orderQtyEl = document.querySelector(`[data-order-qty="${productId}"]`);
+      const reasonEl = document.querySelector(`[data-order-reason="${productId}"]`);
+      const requestProvided = !!requestCheckbox;
+      const orderQty = orderQtyEl ? orderQtyEl.value : "";
+      const reason = reasonEl ? reasonEl.value : "";
+      // #7 koruma: checkbox kapalıysa talep yok kabul et — diğer alanlar dolu olsa bile
+      const requested = requestProvided ? requestCheckbox.checked : !!existing?.orderRequest?.requested;
+
+      const noteChanged = noteProvided && note.trim() !== (existing?.note || "").trim();
+      const requestStateChanged = requestProvided
+        && (!!existing?.orderRequest?.requested !== requested
+          || Number(existing?.orderRequest?.qty || 0) !== Number(orderQty || 0)
+          || String(existing?.orderRequest?.reason || "") !== String(reason));
+
+      if (stockChanged || usedProvided || requestStateChanged || noteChanged) {
         const qty = input.value !== "" ? Number(input.value) : Math.max(startingQty - usedQty, 0);
-        const existingRequest = getTodayCount(input.dataset.count)?.orderRequest || {};
+        const existingRequest = existing?.orderRequest || {};
         const orderRequest = requested
           ? { requested: true, qty: Number(orderQty || 0), reason, status: existingRequest.status || "pending" }
           : { requested: false, qty: 0, reason: "" };
-        setTodayCount(input.dataset.count, qty, note, orderRequest, { usedQty, startingQty });
+        setTodayCount(productId, qty, note, orderRequest, { usedQty, startingQty });
         savedCount += 1;
       }
     });
@@ -4866,7 +5065,8 @@ app.addEventListener("click", async (event) => {
 
   if (action === "toggle-product") {
     const product = state.products.find((item) => item.id === target.dataset.id);
-    if (product) product.active = !product.active;
+    // #12: active alanı undefined ise aktif sayılır
+    if (product) product.active = product.active === false;
     save("hotel-stock-products", state.products);
     if (firebaseState.enabled) {
       saveProductsToFirebase().catch((error) => console.warn("Ürün durumu Firebase'e yazılamadı.", error));
@@ -4894,11 +5094,29 @@ app.addEventListener("click", async (event) => {
     }
     render();
   }
+
+  // #13: Kullanıcı sil
+  if (action === "delete-user") {
+    if (state.user?.role !== "admin") return;
+    const targetUsername = target.dataset.username || "";
+    const displayName = target.dataset.name || targetUsername;
+    const approved = window.confirm(`"${displayName}" (${targetUsername}) kullanıcısı silinsin mi? Bu işlem geri alınamaz.`);
+    if (!approved) return;
+    try {
+      await deleteUserAccount(targetUsername);
+      window.alert("Kullanıcı silindi.");
+      await syncFromBackend();
+      render();
+    } catch (error) {
+      console.warn("Kullanıcı silinemedi.", error);
+      window.alert(error.message || "Kullanıcı silinemedi.");
+    }
+  }
 });
 
 app.addEventListener("input", (event) => {
   if (event.target.dataset.count) {
-    event.target.dataset.stockBase = event.target.value;
+    // #5: stockBase'i live overwrite ETME — ilk render'da set edilen başlangıç miktarı sabit kalır
     state.saveMessage = "";
   }
 
@@ -4923,28 +5141,6 @@ app.addEventListener("input", (event) => {
     state.saveMessage = "";
     render();
     restoreSearchFocus(selectionStart, selectionEnd);
-  }
-});
-
-app.addEventListener("change", async (event) => {
-  if (event.target.dataset.action === "department") {
-    state.selectedDepartment = event.target.value;
-    state.countingPage = 1;
-    state.productPage = 1;
-    state.saveMessage = "";
-    render();
-  }
-
-  if (event.target.dataset.action === "product-department") {
-    state.openStockDepartmentId = event.target.value || state.openStockDepartmentId;
-  }
-
-  if (event.target.dataset.action === "report-date") {
-    state.reportDate = event.target.value || todayKey();
-    if (firebaseState.enabled) {
-      await syncFirebaseDate(state.reportDate);
-    }
-    render();
   }
 });
 
@@ -4991,39 +5187,14 @@ app.addEventListener("submit", async (event) => {
     state.selectedDepartment = user.role === "admin" ? "all" : user.departmentId;
     state.view = user.role === "admin" ? "dashboard" : "sayim";
     await syncFromBackend();
+    // #15: backend ulaşılamadıysa bile login sonrası reset'i bir kez uygula
+    applyStockResetIfNeeded();
     render();
   }
 
   if (action === "product-form") {
     upsertProduct(event.target);
     event.target.reset();
-    render();
-  }
-
-  if (action === "portion-form") {
-    const formData = new FormData(event.target);
-    state.portionSettings = normalizePortionSettings({
-      ...state.portionSettings,
-      people: formData.get("people"),
-      profileId: String(formData.get("profileId") || state.portionSettings.profileId),
-      departmentId: String(formData.get("departmentId") || state.portionSettings.departmentId),
-      date: String(formData.get("date") || state.portionSettings.date),
-      bufferPercent: formData.get("bufferPercent"),
-    });
-    save("hotel-portion-settings", state.portionSettings);
-    if (firebaseState.enabled) {
-      await syncFirebaseDate(state.portionSettings.date);
-    }
-    render();
-  }
-
-  if (action === "portion-note-form") {
-    const formData = new FormData(event.target);
-    state.portionSettings = normalizePortionSettings({
-      ...state.portionSettings,
-      note: String(formData.get("note") || "").trim(),
-    });
-    save("hotel-portion-settings", state.portionSettings);
     render();
   }
 
@@ -5084,6 +5255,27 @@ app.addEventListener("submit", async (event) => {
     } catch (error) {
       console.warn("Kullanıcı güncellenemedi.", error);
       window.alert(error.message || "Kullanıcı güncellenemedi.");
+    }
+  }
+
+  // #13: Yeni kullanıcı oluştur
+  if (action === "user-create") {
+    if (state.user?.role !== "admin") return;
+    const formData = new FormData(event.target);
+    try {
+      await createUserAccount({
+        name: formData.get("name"),
+        username: formData.get("username"),
+        password: formData.get("password"),
+        role: formData.get("role"),
+        departmentId: formData.get("departmentId"),
+      });
+      window.alert("Yeni kullanıcı oluşturuldu.");
+      await syncFromBackend();
+      render();
+    } catch (error) {
+      console.warn("Kullanıcı oluşturulamadı.", error);
+      window.alert(error.message || "Kullanıcı oluşturulamadı.");
     }
   }
 });

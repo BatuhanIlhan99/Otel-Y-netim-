@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 let nodemailer = null;
 try {
   nodemailer = require("nodemailer");
@@ -664,7 +665,6 @@ function buildOrderActionReportHtml(db, date, departmentId = "all") {
 }
 
 function buildOrderReportMail(db, date, departmentId = "all") {
-  return buildOrderActionReportMail(db, date, departmentId);
   const settings = normalizeMailSettings(db.mailSettings).report;
   const report = buildDailyReport(db, date, departmentId);
   const lines = [
@@ -741,7 +741,6 @@ function buildOrderReportMail(db, date, departmentId = "all") {
 }
 
 function buildOrderReportHtml(db, date, departmentId = "all") {
-  return buildOrderActionReportHtml(db, date, departmentId);
   const settings = normalizeMailSettings(db.mailSettings).report;
   const report = buildDailyReport(db, date, departmentId);
   const rows = (items, emptyText) => {
@@ -1098,6 +1097,25 @@ function validateProduct(product) {
   return errors;
 }
 
+// #10: aynı departman + aynı isim duplicate ürün engeli (TR locale, case-insensitive)
+function productCatalogKey(product) {
+  return `${String(product.departmentId || "").trim()}::${String(product.name || "").trim().toLocaleLowerCase("tr-TR")}`;
+}
+
+function findDuplicateProduct(db, product, excludeId = null) {
+  const key = productCatalogKey(product);
+  return (db.products || []).find((item) => item.id !== excludeId && productCatalogKey(item) === key);
+}
+
+const COMPRESSIBLE_EXTS = new Set([".html", ".css", ".js", ".json", ".svg", ".txt"]);
+
+function pickEncoding(acceptEncoding) {
+  const ae = String(acceptEncoding || "").toLowerCase();
+  if (ae.includes("br")) return "br";
+  if (ae.includes("gzip")) return "gzip";
+  return null;
+}
+
 function serveStatic(req, res, pathname) {
   const safePath = pathname === "/" ? "/index.html" : pathname;
   const filePath = path.normalize(path.join(ROOT, safePath));
@@ -1120,15 +1138,45 @@ function serveStatic(req, res, pathname) {
     return;
   }
   const ext = path.extname(filePath).toLowerCase();
-  const cacheControl = ["config.js", "app.js", "styles.css", "index.html"].includes(path.basename(filePath))
-    ? "no-store"
-    : "public, max-age=300";
-  res.writeHead(200, {
+  const baseName = path.basename(filePath);
+  const hasVersionQuery = /[?&]v=/.test(req.url || "");
+  let cacheControl;
+  if (baseName === "index.html") {
+    cacheControl = "no-cache";
+  } else if (hasVersionQuery && [".js", ".css"].includes(ext)) {
+    cacheControl = "public, max-age=31536000, immutable";
+  } else if ([".js", ".css", ".svg", ".png", ".jpg", ".jpeg"].includes(ext)) {
+    cacheControl = "public, max-age=3600";
+  } else {
+    cacheControl = "public, max-age=300";
+  }
+
+  const stat = fs.statSync(filePath);
+  const etag = `W/"${stat.size.toString(16)}-${stat.mtimeMs.toString(16)}"`;
+  if (req.headers["if-none-match"] === etag) {
+    res.writeHead(304, { "Cache-Control": cacheControl, "ETag": etag, ...securityHeaders() });
+    res.end();
+    return;
+  }
+
+  const encoding = COMPRESSIBLE_EXTS.has(ext) && stat.size > 1024 ? pickEncoding(req.headers["accept-encoding"]) : null;
+  const headers = {
     "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
     "Cache-Control": cacheControl,
+    "ETag": etag,
+    "Vary": "Accept-Encoding",
     ...securityHeaders(),
-  });
-  fs.createReadStream(filePath).pipe(res);
+  };
+  if (encoding) headers["Content-Encoding"] = encoding;
+  res.writeHead(200, headers);
+  const stream = fs.createReadStream(filePath);
+  if (encoding === "br") {
+    stream.pipe(zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } })).pipe(res);
+  } else if (encoding === "gzip") {
+    stream.pipe(zlib.createGzip({ level: 6 })).pipe(res);
+  } else {
+    stream.pipe(res);
+  }
 }
 
 async function handleApi(req, res, url) {
@@ -1177,6 +1225,47 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  // #13: Yeni kullanıcı oluştur — admin yetkisi gerekli
+  if (req.method === "POST" && pathname === "/api/users") {
+    const adminUser = requireAuth(req, res, ["admin"]);
+    if (!adminUser) return;
+    const body = await parseBody(req);
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "").trim();
+    const name = String(body.name || username).trim();
+    const role = body.role === "admin" ? "admin" : "staff";
+    const departmentId = String(body.departmentId || "").trim();
+    if (!username) {
+      sendJson(res, 400, { ok: false, message: "Kullanıcı adı boş olamaz." });
+      return;
+    }
+    if (!password) {
+      sendJson(res, 400, { ok: false, message: "Şifre boş olamaz." });
+      return;
+    }
+    if (role === "staff" && !departmentId) {
+      sendJson(res, 400, { ok: false, message: "Personel için departman zorunlu." });
+      return;
+    }
+    if (db.users.some((item) => item.username === username)) {
+      sendJson(res, 409, { ok: false, message: "Bu kullanıcı adı zaten kullanılıyor." });
+      return;
+    }
+    const newUser = {
+      username,
+      name,
+      role,
+      departmentId: role === "admin" ? departmentId || "" : departmentId,
+      passwordHash: hashPassword(password),
+      createdAt: new Date().toISOString(),
+      createdBy: adminUser.username,
+    };
+    db.users.push(newUser);
+    saveDb(db);
+    sendJson(res, 201, publicUser(newUser));
+    return;
+  }
+
   const userMatch = pathname.match(/^\/api\/users\/([^/]+)$/);
   if (req.method === "PUT" && userMatch) {
     const adminUser = requireAuth(req, res, ["admin"]);
@@ -1213,6 +1302,40 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  // #13: Kullanıcı sil — admin yetkisi gerekli; son admin silinemez; kullanıcı kendi hesabını silemez
+  if (req.method === "DELETE" && userMatch) {
+    const adminUser = requireAuth(req, res, ["admin"]);
+    if (!adminUser) return;
+    const targetUsername = decodeURIComponent(userMatch[1]);
+    const index = db.users.findIndex((item) => item.username === targetUsername);
+    if (index < 0) {
+      sendJson(res, 404, { ok: false, message: "Kullanıcı bulunamadı." });
+      return;
+    }
+    if (targetUsername === adminUser.username) {
+      sendJson(res, 400, { ok: false, message: "Kendi hesabını silemezsin." });
+      return;
+    }
+    const target = db.users[index];
+    if (target.role === "admin") {
+      const remainingAdmins = db.users.filter((item, i) => i !== index && item.role === "admin").length;
+      if (remainingAdmins === 0) {
+        sendJson(res, 400, { ok: false, message: "Sistemde en az bir admin olmalı." });
+        return;
+      }
+    }
+    db.users.splice(index, 1);
+    // İlgili kullanıcının açık oturum token'larını da iptal et
+    for (const [token, session] of sessions.entries()) {
+      if (session?.user?.username === targetUsername) {
+        sessions.delete(token);
+      }
+    }
+    saveDb(db);
+    sendJson(res, 200, { ok: true, deleted: targetUsername });
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/products") {
     const user = requireAuth(req, res);
     if (!user) return;
@@ -1242,6 +1365,16 @@ async function handleApi(req, res, url) {
     const errors = validateProduct(product);
     if (errors.length > 0) {
       sendJson(res, 400, { ok: false, errors });
+      return;
+    }
+    // #10: aynı departman+isim varsa 409 dön
+    const duplicate = findDuplicateProduct(db, product);
+    if (duplicate) {
+      sendJson(res, 409, {
+        ok: false,
+        message: `Bu departmanda aynı isimde ürün zaten var: "${duplicate.name}".`,
+        existingId: duplicate.id,
+      });
       return;
     }
     product.id = product.id || `p-${Date.now()}`;
@@ -1277,12 +1410,26 @@ async function handleApi(req, res, url) {
     if (user.role !== "admin") {
       product.departmentId = user.departmentId;
     }
+    // #10: PUT'ta da duplicate kontrol — başka bir ürünle aynı isim+departman çakışıyorsa reddet
+    const duplicate = findDuplicateProduct(db, product, id);
+    if (duplicate) {
+      sendJson(res, 409, {
+        ok: false,
+        message: `Bu departmanda aynı isimde başka ürün var: "${duplicate.name}".`,
+        existingId: duplicate.id,
+      });
+      return;
+    }
+    // #11: birim değişikliği geçmiş sayımları korumak için snapshot tutulur; eski ürün birimini kaydet
+    const previousUnit = db.products[index].unit;
     db.products[index] = {
       ...product,
       id,
       lastQty: Number(product.lastQty),
       minQty: Number(product.minQty),
       active: product.active !== false,
+      previousUnit: previousUnit && previousUnit !== product.unit ? previousUnit : db.products[index].previousUnit,
+      unitChangedAt: previousUnit && previousUnit !== product.unit ? new Date().toISOString() : db.products[index].unitChangedAt,
     };
     saveDb(db);
     sendJson(res, 200, db.products[index]);
@@ -1323,7 +1470,18 @@ async function handleApi(req, res, url) {
       sendJson(res, 400, { ok: false, message: "Sayım miktarı geçersiz." });
       return;
     }
-    const date = body.date || todayKey();
+    const today = todayKey();
+    const requestedDate = body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : today;
+    // #16: geçmiş tarih yalnızca admin tarafından girilebilir; gelecek tarih hiç kabul edilmez
+    if (requestedDate > today) {
+      sendJson(res, 400, { ok: false, message: "Gelecek tarihe sayım girilemez." });
+      return;
+    }
+    if (requestedDate < today && user.role !== "admin") {
+      sendJson(res, 403, { ok: false, message: "Geçmiş tarihe sayım girmek için admin yetkisi gerekli." });
+      return;
+    }
+    const date = requestedDate;
     db.counts[date] ||= {};
     const usedQty = Number.isFinite(Number(body.usedQty)) ? Math.max(Number(body.usedQty), 0) : 0;
     const startingQty = Number.isFinite(Number(body.startingQty)) ? Number(body.startingQty) : Number(product.lastQty || 0);
@@ -1331,6 +1489,8 @@ async function handleApi(req, res, url) {
       qty: Number(body.qty),
       usedQty,
       startingQty,
+      // #11: birim snapshot — ürün ileride birim değiştirirse geçmiş kayıt orijinal birimle korunur
+      unit: product.unit || "",
       note: body.note || "",
       orderRequest: body.orderRequest?.requested
         ? {
@@ -1347,8 +1507,11 @@ async function handleApi(req, res, url) {
       departmentId: product.departmentId,
       time: body.time || timeKey(),
     };
-    product.lastQty = Number(body.qty);
-    product.updatedAt = new Date().toISOString();
+    // #16: yalnızca bugünün sayımı ürünün lastQty'sini günceller; geçmiş sayım canlı stoğu değiştirmez
+    if (date === today) {
+      product.lastQty = Number(body.qty);
+      product.updatedAt = new Date().toISOString();
+    }
     saveDb(db);
     sendJson(res, 200, db.counts[date][body.productId]);
     return;
@@ -1425,15 +1588,19 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && pathname === "/api/mail/send-reminder") {
     const user = requireAuth(req, res, ["admin"]);
     if (!user) return;
+    const today = todayKey();
     const body = buildReminderMail(db);
     const html = buildReminderHtml(db);
-    const result = await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body, html, { date: todayKey(), manual: true, username: user.username });
+    const result = await sendMailOrLog("reminder", db.mailSettings.reminder.subject, db.mailSettings.reminder.recipients, body, html, { date: today, manual: true, username: user.username });
+    // #8: manuel send sonrası delivery işaretle ki otomasyon aynı gün ikinci kez göndermesin
+    markDelivery("reminder", today, result);
     sendJson(res, 200, result);
     return;
   }
 
   if (req.method === "POST" && pathname === "/api/mail/send-report") {
-    const user = requireAuth(req, res);
+    // #8 (ek): manuel rapor gönderimi admin yetkisi gerektirsin (privilege escalation engeli)
+    const user = requireAuth(req, res, ["admin"]);
     if (!user) return;
     const date = searchParams.get("date") || todayKey();
     const requestedDepartmentId = searchParams.get("departmentId") || "all";
@@ -1441,6 +1608,10 @@ async function handleApi(req, res, url) {
     const body = buildOrderReportMail(db, date, departmentId);
     const html = buildOrderReportHtml(db, date, departmentId);
     const result = await sendMailOrLog("report", db.mailSettings.report.subject, db.mailSettings.report.recipients, body, html, { date, departmentId, manual: true, username: user.username });
+    // #8: manuel rapor sonrası otomasyon aynı gün ikinci kez tetiklenmesin
+    if (date === todayKey()) {
+      markDelivery("report", date, result);
+    }
     sendJson(res, 200, result);
     return;
   }
@@ -1498,9 +1669,16 @@ setInterval(() => {
 }, 60_000);
 
 loadDb();
-runDueAutomations().catch((error) => {
-  console.error("Baslangic otomasyon hatasi", error);
-});
+
+// #9: Server restart'larında anında runDueAutomations çağrısı yapıyorduk; bu Render gibi ephemeral
+// disklerde mail-state.json kaybolduğunda aynı gün ikinci kez mail tetikliyordu.
+// Artık ilk çalıştırmayı 60 sn geciktiriyoruz — bu sırada bir önceki delivery state varsa
+// dosya yüklenmiş, scheduler kontrolü düzgün çalışacak.
+setTimeout(() => {
+  runDueAutomations().catch((error) => {
+    console.error("Baslangic otomasyon hatasi", error);
+  });
+}, 60_000);
 
 server.listen(PORT, HOST, () => {
   console.log(`Otel Yonetim backend calisiyor: http://${HOST}:${PORT}/`);
