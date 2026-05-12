@@ -2316,6 +2316,7 @@ function renderCounting() {
 
   return `
     ${renderStats()}
+    ${state.user?.role !== "admin" ? renderStaffProductAddPanel() : ""}
     <section class="panel usage-overview">
       <div class="panel-head">
         <div>
@@ -4036,6 +4037,22 @@ function renderProductsAdmin() {
   `;
 }
 
+function renderStaffProductAddPanel() {
+  const departmentId = state.user?.departmentId;
+  return `
+    <section class="panel staff-product-panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">Departman ürün ekleme</h3>
+          <span class="hint">Bu bölümden yalnızca kendi departmanına yeni stok kalemi ekleyebilirsin.</span>
+        </div>
+        <span class="badge">${escapeHtml(departmentName(departmentId))}</span>
+      </div>
+      ${renderProductForm(departmentId)}
+    </section>
+  `;
+}
+
 function renderDepartmentStockForms(editingProduct) {
   if (editingProduct) {
     return `
@@ -4113,6 +4130,7 @@ function renderProductForm(departmentId, product = null, allowDepartmentSelect =
   return `
     <form class="form-body compact-product-form" data-action="product-form">
       <input type="hidden" name="id" value="${product?.id || ""}" />
+      ${state.user?.role !== "admin" && !product ? `<input type="hidden" name="departmentId" value="${escapeHtml(departmentId)}" />` : ""}
       <div class="quick-product-grid">
         <div class="form-row">
           <label>Ürün adı</label>
@@ -4586,10 +4604,19 @@ function upsertProduct(form) {
   const formData = new FormData(form);
   const id = String(formData.get("id") || "");
   const isUpdate = Boolean(id);
+  const existingProduct = isUpdate ? state.products.find((item) => item.id === id) : null;
+  const requestedDepartmentId = String(formData.get("departmentId") || state.user?.departmentId || "");
+  const departmentId = state.user?.role === "admin"
+    ? requestedDepartmentId
+    : existingProduct?.departmentId || state.user?.departmentId;
+  if (state.user?.role !== "admin" && departmentId !== state.user?.departmentId) {
+    window.alert("Sadece kendi departmanına ürün ekleyebilirsin.");
+    return;
+  }
   const product = {
     id: id || `p-${Date.now()}`,
     name: String(formData.get("name") || "").trim(),
-    departmentId: String(formData.get("departmentId") || ""),
+    departmentId,
     unit: String(formData.get("unit") || "").trim(),
     lastQty: Number(formData.get("lastQty") || 0),
     minQty: Number(formData.get("minQty") || 0),
@@ -4598,6 +4625,7 @@ function upsertProduct(form) {
 
   if (isUpdate) {
     const index = state.products.findIndex((item) => item.id === id);
+    if (index < 0) return;
     product.active = state.products[index]?.active ?? true;
     state.products[index] = product;
   } else {
@@ -4960,6 +4988,7 @@ app.addEventListener("submit", async (event) => {
 
   if (action === "product-form") {
     upsertProduct(event.target);
+    event.target.reset();
     render();
   }
 

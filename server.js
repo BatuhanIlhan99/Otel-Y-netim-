@@ -1233,9 +1233,12 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && pathname === "/api/products") {
-    const user = requireAuth(req, res, ["admin"]);
+    const user = requireAuth(req, res);
     if (!user) return;
     const product = await parseBody(req);
+    if (user.role !== "admin") {
+      product.departmentId = user.departmentId;
+    }
     const errors = validateProduct(product);
     if (errors.length > 0) {
       sendJson(res, 400, { ok: false, errors });
@@ -1253,7 +1256,7 @@ async function handleApi(req, res, url) {
 
   const productMatch = pathname.match(/^\/api\/products\/([^/]+)$/);
   if (req.method === "PUT" && productMatch) {
-    const user = requireAuth(req, res, ["admin"]);
+    const user = requireAuth(req, res);
     if (!user) return;
     const id = decodeURIComponent(productMatch[1]);
     const product = await parseBody(req);
@@ -1266,6 +1269,13 @@ async function handleApi(req, res, url) {
     if (index < 0) {
       sendText(res, 404, "Product not found");
       return;
+    }
+    if (user.role !== "admin" && db.products[index].departmentId !== user.departmentId) {
+      sendJson(res, 403, { ok: false, message: "Bu departman için ürün düzenleme yetkin yok." });
+      return;
+    }
+    if (user.role !== "admin") {
+      product.departmentId = user.departmentId;
     }
     db.products[index] = {
       ...product,
