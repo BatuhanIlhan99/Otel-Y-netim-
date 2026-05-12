@@ -1120,7 +1120,7 @@ function serveStatic(req, res, pathname) {
     return;
   }
   const ext = path.extname(filePath).toLowerCase();
-  const cacheControl = path.basename(filePath) === "config.js"
+  const cacheControl = ["config.js", "app.js", "styles.css", "index.html"].includes(path.basename(filePath))
     ? "no-store"
     : "public, max-age=300";
   res.writeHead(200, {
