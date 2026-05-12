@@ -464,6 +464,52 @@ tbody tr:hover {
   cursor: not-allowed;
 }
 
+.quick-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 0 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filter-pill strong {
+  min-width: 24px;
+  border-radius: 999px;
+  background: #eef4f2;
+  color: var(--brand);
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.filter-pill.active {
+  border-color: var(--brand);
+  background: #edf7f4;
+  color: var(--brand-strong);
+}
+
+.inline-status {
+  margin: -2px 0 12px;
+  border: 1px solid #cfe5df;
+  border-radius: 8px;
+  background: #f3faf8;
+  color: var(--brand-strong);
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
 .user-editor-list {
   display: grid;
   gap: 10px;
@@ -1349,6 +1395,15 @@ tbody tr:hover {
     width: 100%;
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+
+  .quick-filter-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .filter-pill {
+    justify-content: space-between;
   }
 
   .inline-actions {

@@ -1078,8 +1078,10 @@ const state = {
   selectedDepartment: "all",
   reportDate: new Date().toISOString().slice(0, 10),
   search: "",
+  countingFilter: "all",
   countingPage: 1,
   productPage: 1,
+  saveMessage: "",
   editingProductId: null,
   openStockDepartmentId: "temizlik",
   sessionToken: sessionStorage.getItem("otel-yonetim-token") || "",
@@ -1617,6 +1619,43 @@ function renderPager(meta, target) {
       <button class="mini-btn" data-action="page-${target}" data-page="${meta.currentPage - 1}" ${meta.currentPage <= 1 ? "disabled" : ""}>Önceki</button>
       <span>Sayfa ${meta.currentPage}/${meta.totalPages}</span>
       <button class="mini-btn" data-action="page-${target}" data-page="${meta.currentPage + 1}" ${meta.currentPage >= meta.totalPages ? "disabled" : ""}>Sonraki</button>
+    </div>
+  `;
+}
+
+function isProductCritical(product, count = getTodayCount(product.id)) {
+  const qty = count ? Number(count.qty) : Number(product.lastQty);
+  return qty <= Number(product.minQty);
+}
+
+function applyCountingFilter(products) {
+  return products.filter((product) => {
+    const count = getTodayCount(product.id);
+    if (state.countingFilter === "pending") return !count;
+    if (state.countingFilter === "critical") return isProductCritical(product, count);
+    if (state.countingFilter === "requested") return hasManualOrderRequest(count);
+    if (state.countingFilter === "used") return Number(count?.usedQty || 0) > 0;
+    return true;
+  });
+}
+
+function renderCountingFilters(products) {
+  const options = [
+    { id: "all", label: "Tümü", count: products.length },
+    { id: "pending", label: "Sayılmayan", count: products.filter((product) => !getTodayCount(product.id)).length },
+    { id: "critical", label: "Kritik", count: products.filter((product) => isProductCritical(product)).length },
+    { id: "requested", label: "Sipariş talebi", count: products.filter((product) => hasManualOrderRequest(getTodayCount(product.id))).length },
+    { id: "used", label: "Kullanım girilen", count: products.filter((product) => Number(getTodayCount(product.id)?.usedQty || 0) > 0).length },
+  ];
+
+  return `
+    <div class="quick-filter-bar" aria-label="Sayım filtreleri">
+      ${options.map((option) => `
+        <button class="filter-pill ${state.countingFilter === option.id ? "active" : ""}" data-action="set-counting-filter" data-filter="${option.id}">
+          <span>${escapeHtml(option.label)}</span>
+          <strong>${option.count}</strong>
+        </button>
+      `).join("")}
     </div>
   `;
 }
@@ -2226,10 +2265,11 @@ function renderStockMovements() {
 }
 
 function renderCounting() {
-  const allProducts = visibleProducts();
+  const baseProducts = visibleProducts();
+  const allProducts = applyCountingFilter(baseProducts);
   const pageMeta = paginatedItems(allProducts, state.countingPage, countingPageSize);
   state.countingPage = pageMeta.currentPage;
-  const usedRows = allProducts
+  const usedRows = baseProducts
     .map((product) => ({ product, count: getTodayCount(product.id) }))
     .filter(({ count }) => Number(count?.usedQty || 0) > 0);
   const usageCritical = usedRows.filter(({ product, count }) => Number(count.qty || 0) <= Number(product.minQty || 0)).length;
@@ -2301,6 +2341,8 @@ function renderCounting() {
           ${renderPager(pageMeta, "counting")}
         </div>
       </div>
+      ${renderCountingFilters(baseProducts)}
+      ${state.saveMessage ? `<div class="inline-status">${escapeHtml(state.saveMessage)}</div>` : ""}
       <div class="table-wrap">
         <table>
           <thead>
@@ -4601,6 +4643,7 @@ app.addEventListener("click", async (event) => {
   }
 
   if (action === "save-counts") {
+    let savedCount = 0;
     document.querySelectorAll("[data-count]").forEach((input) => {
       const note = document.querySelector(`[data-note="${input.dataset.count}"]`)?.value || "";
       const usedRaw = document.querySelector(`[data-used="${input.dataset.count}"]`)?.value || "";
@@ -4618,18 +4661,28 @@ app.addEventListener("click", async (event) => {
           ? { requested: true, qty: Number(orderQty || 0), reason, status: existingRequest.status || "pending" }
           : { requested: false, qty: 0, reason: "" };
         setTodayCount(input.dataset.count, qty, note, orderRequest, { usedQty, startingQty });
+        savedCount += 1;
       }
     });
+    state.saveMessage = savedCount ? `${savedCount} ürün kaydedildi.` : "Kaydedilecek değişiklik bulunamadı.";
     render();
   }
 
   if (action === "page-counting") {
     state.countingPage = Math.max(1, Number(target.dataset.page || 1));
+    state.saveMessage = "";
     render();
   }
 
   if (action === "page-products") {
     state.productPage = Math.max(1, Number(target.dataset.page || 1));
+    render();
+  }
+
+  if (action === "set-counting-filter") {
+    state.countingFilter = target.dataset.filter || "all";
+    state.countingPage = 1;
+    state.saveMessage = "";
     render();
   }
 
@@ -4831,6 +4884,7 @@ app.addEventListener("input", (event) => {
     state.search = event.target.value;
     state.countingPage = 1;
     state.productPage = 1;
+    state.saveMessage = "";
     render();
     restoreSearchFocus(selectionStart, selectionEnd);
   }
@@ -4841,6 +4895,7 @@ app.addEventListener("change", async (event) => {
     state.selectedDepartment = event.target.value;
     state.countingPage = 1;
     state.productPage = 1;
+    state.saveMessage = "";
     render();
   }
 
