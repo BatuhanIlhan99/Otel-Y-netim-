@@ -21,6 +21,8 @@ let users = load("hotel-stock-users", defaultUsers);
 
 const foodDepartmentIds = ["gulplaj-restorant", "gulplaj-bufe", "smile-food-house"];
 const stockResetVersion = "2026-05-12-zero-stock-v1";
+const countingPageSize = 80;
+const productAdminPageSize = 80;
 
 const portionProfiles = {
   "hotel-buffet": {
@@ -1076,6 +1078,8 @@ const state = {
   selectedDepartment: "all",
   reportDate: new Date().toISOString().slice(0, 10),
   search: "",
+  countingPage: 1,
+  productPage: 1,
   editingProductId: null,
   openStockDepartmentId: "temizlik",
   sessionToken: sessionStorage.getItem("otel-yonetim-token") || "",
@@ -1589,6 +1593,32 @@ function visibleProducts({ includeInactive = false } = {}) {
     const activeMatch = includeInactive || product.active;
     return activeMatch && inDepartment && inSearch;
   });
+}
+
+function paginatedItems(items, page, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  return {
+    items: items.slice(start, start + pageSize),
+    currentPage,
+    totalPages,
+    totalItems: items.length,
+    start,
+    end: Math.min(start + pageSize, items.length),
+  };
+}
+
+function renderPager(meta, target) {
+  if (meta.totalItems <= meta.items.length) return "";
+  return `
+    <div class="pager">
+      <span>${meta.start + 1}-${meta.end} / ${meta.totalItems}</span>
+      <button class="mini-btn" data-action="page-${target}" data-page="${meta.currentPage - 1}" ${meta.currentPage <= 1 ? "disabled" : ""}>Önceki</button>
+      <span>Sayfa ${meta.currentPage}/${meta.totalPages}</span>
+      <button class="mini-btn" data-action="page-${target}" data-page="${meta.currentPage + 1}" ${meta.currentPage >= meta.totalPages ? "disabled" : ""}>Sonraki</button>
+    </div>
+  `;
 }
 
 function getTodayCount(productId) {
@@ -2196,7 +2226,10 @@ function renderStockMovements() {
 }
 
 function renderCounting() {
-  const usedRows = visibleProducts()
+  const allProducts = visibleProducts();
+  const pageMeta = paginatedItems(allProducts, state.countingPage, countingPageSize);
+  state.countingPage = pageMeta.currentPage;
+  const usedRows = allProducts
     .map((product) => ({ product, count: getTodayCount(product.id) }))
     .filter(({ count }) => Number(count?.usedQty || 0) > 0);
   const usageCritical = usedRows.filter(({ product, count }) => Number(count.qty || 0) <= Number(product.minQty || 0)).length;
@@ -2206,7 +2239,7 @@ function renderCounting() {
       <span>${escapeHtml(formatReportNumber(count.usedQty))} ${escapeHtml(product.unit)} kullanildi, kalan ${escapeHtml(formatReportNumber(count.qty))}</span>
     </li>
   `).join("");
-  const rows = visibleProducts()
+  const rows = pageMeta.items
     .map((product) => {
       const count = getTodayCount(product.id);
       const qty = count?.qty ?? "";
@@ -2265,6 +2298,7 @@ function renderCounting() {
           <input class="search" value="${escapeHtml(state.search)}" placeholder="Ürün ara" data-action="search" />
           <button class="btn" data-action="save-counts">Kaydet</button>
           <button class="btn secondary" data-view="rapor">Raporu gonder</button>
+          ${renderPager(pageMeta, "counting")}
         </div>
       </div>
       <div class="table-wrap">
@@ -2329,7 +2363,7 @@ function renderReport() {
         <div class="mail-preview">${escapeHtml(buildMailReport())}</div>
       </section>
     </div>
-    ${renderDetailedReportTable(state.reportDate)}
+    ${renderDetailedReportTable(state.reportDate, 120)}
   `;
 }
 
@@ -2958,8 +2992,10 @@ function renderPortionReferencePanel(snapshot) {
   `;
 }
 
-function renderDetailedReportTable(date = state.reportDate) {
-  const rows = reportProductRows(date)
+function renderDetailedReportTable(date = state.reportDate, limit = 120) {
+  const allRows = reportProductRows(date);
+  const rows = allRows
+    .slice(0, limit)
     .map((row) => `
       <tr>
         <td data-label="Departman">${escapeHtml(row.department)}</td>
@@ -2980,7 +3016,10 @@ function renderDetailedReportTable(date = state.reportDate) {
   return `
     <section class="panel">
       <div class="panel-head">
-        <h3 class="panel-title">Rapor detay tablosu</h3>
+        <div>
+          <h3 class="panel-title">Rapor detay tablosu</h3>
+          <span class="hint">Performans icin ekranda ilk ${Math.min(limit, allRows.length)} kayit gosterilir; tam liste Excel/CSV dosyasina aktarilir.</span>
+        </div>
         <span class="badge">${escapeHtml(reportScopeLabel())}</span>
       </div>
       <div class="table-wrap report-detail-wrap">
@@ -3909,7 +3948,10 @@ async function openEmailReport() {
 
 function renderProductsAdmin() {
   const editingProduct = state.products.find((product) => product.id === state.editingProductId);
-  const rows = visibleProducts({ includeInactive: true })
+  const allProducts = visibleProducts({ includeInactive: true });
+  const pageMeta = paginatedItems(allProducts, state.productPage, productAdminPageSize);
+  state.productPage = pageMeta.currentPage;
+  const rows = pageMeta.items
     .map((product) => `
       <tr>
         <td data-label="Ürün"><strong>${escapeHtml(product.name)}</strong></td>
@@ -3937,6 +3979,7 @@ function renderProductsAdmin() {
           <div class="toolbar">
             ${renderDepartmentFilter()}
             <input class="search" value="${escapeHtml(state.search)}" placeholder="Ürün ara" data-action="search" />
+            ${renderPager(pageMeta, "products")}
             <button class="btn warn" data-action="reset-demo">Demo verisini sıfırla</button>
           </div>
         </div>
@@ -4539,6 +4582,8 @@ app.addEventListener("click", async (event) => {
 
   if (view) {
     state.view = view;
+    state.countingPage = 1;
+    state.productPage = 1;
     render();
   }
 
@@ -4575,6 +4620,16 @@ app.addEventListener("click", async (event) => {
         setTodayCount(input.dataset.count, qty, note, orderRequest, { usedQty, startingQty });
       }
     });
+    render();
+  }
+
+  if (action === "page-counting") {
+    state.countingPage = Math.max(1, Number(target.dataset.page || 1));
+    render();
+  }
+
+  if (action === "page-products") {
+    state.productPage = Math.max(1, Number(target.dataset.page || 1));
     render();
   }
 
@@ -4774,6 +4829,8 @@ app.addEventListener("input", (event) => {
     const selectionStart = event.target.selectionStart;
     const selectionEnd = event.target.selectionEnd;
     state.search = event.target.value;
+    state.countingPage = 1;
+    state.productPage = 1;
     render();
     restoreSearchFocus(selectionStart, selectionEnd);
   }
@@ -4782,6 +4839,8 @@ app.addEventListener("input", (event) => {
 app.addEventListener("change", async (event) => {
   if (event.target.dataset.action === "department") {
     state.selectedDepartment = event.target.value;
+    state.countingPage = 1;
+    state.productPage = 1;
     render();
   }
 

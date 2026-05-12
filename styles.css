@@ -446,6 +446,24 @@ tbody tr:hover {
   min-width: 190px;
 }
 
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 5px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pager .mini-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .user-editor-list {
   display: grid;
   gap: 10px;
@@ -1325,6 +1343,12 @@ tbody tr:hover {
 
   .user-editor-card {
     grid-template-columns: 1fr;
+  }
+
+  .pager {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .inline-actions {
