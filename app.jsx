@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Komuta Paneli", icon: "dashboard", roles: ["admin", "departman"] },
   { id: "stock", label: "Stok Sayım", icon: "stock", roles: ["admin", "departman"] },
   { id: "orders", label: "Sipariş Talepleri", icon: "orders", roles: ["admin", "departman"], badge: "danger" },
+  { id: "bildirimler", label: "Bildirimler", icon: "bell", roles: ["admin", "departman"], badge: "warn" },
   { id: "reports", label: "Günlük Rapor", icon: "reports", roles: ["admin"] },
 ];
 
@@ -18,8 +19,8 @@ const ADMIN_NAV = [
 const MOBILE_NAV = [
   { id: "dashboard", label: "Panel", icon: "dashboard" },
   { id: "stock", label: "Sayım", icon: "stock" },
+  { id: "bildirimler", label: "Bildirim", icon: "bell", badge: "notif" },
   { id: "orders", label: "Sipariş", icon: "orders", badge: true },
-  { id: "reports", label: "Rapor", icon: "reports" },
   { id: "more", label: "Daha", icon: "more" },
 ];
 
@@ -29,6 +30,7 @@ function App() {
   const [stockDept, setStockDept] = React.useState(null);
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
+  const [notifAlert, setNotifAlert] = React.useState(null);
 
   // Tweaks state
   const [tweaks, setTweaks] = React.useState({
@@ -97,6 +99,20 @@ function App() {
     }
   }, [tweaks]);
 
+  // Login sonrası: kullanıcının görmediği yeni bildirim varsa modal tetikle
+  React.useEffect(() => {
+    if (!user) {
+      setNotifAlert(null);
+      return;
+    }
+    const items = lsLoad("notifications", []);
+    const lastSeen = getLastSeenAt(user.username);
+    const fresh = newNotificationsForUser(items, user, lastSeen);
+    if (fresh.length > 0) {
+      setNotifAlert(fresh);
+    }
+  }, [user]);
+
   if (!user) {
     return <LoginScreen onLogin={u => { setUser(u); setRoute("dashboard"); }} />;
   }
@@ -112,6 +128,7 @@ function App() {
     case "dashboard": currentScreen = <Dashboard currentUser={user} onNavigate={navigate} />; break;
     case "stock": currentScreen = <StockCount currentUser={user} selectedDept={stockDept} onNavigate={navigate} />; break;
     case "orders": currentScreen = <Orders currentUser={user} onNavigate={navigate} />; break;
+    case "bildirimler": currentScreen = <Notifications currentUser={user} onNavigate={navigate} />; break;
     case "reports": currentScreen = <Reports onNavigate={navigate} />; break;
     case "products": currentScreen = <AdminProducts onNavigate={navigate} />; break;
     case "users": currentScreen = <AdminUsers />; break;
@@ -121,6 +138,12 @@ function App() {
 
   const allNav = [...NAV_ITEMS, ...ADMIN_NAV].filter(n => n.roles.includes(user.role));
   const pendingOrdersCount = ORDER_REQUESTS.filter(o => o.status === "pending").length;
+
+  // Bildirim sayacı: kullanıcıya görünen açık (resolved olmayan) bildirimler.
+  // notifications.jsx içinde openNotificationCount helper'ı window'a export ediliyor;
+  // build sırasında her render'da localStorage'dan tazeleniyor.
+  const _notifItems = lsLoad("notifications", []);
+  const openNotifCount = openNotificationCount(_notifItems, user);
 
   return (
     <div className="app-shell">
@@ -146,6 +169,9 @@ function App() {
               {n.label}
               {n.id === "orders" && pendingOrdersCount > 0 && (
                 <span className="rail-badge">{pendingOrdersCount}</span>
+              )}
+              {n.id === "bildirimler" && openNotifCount > 0 && (
+                <span className="rail-badge">{openNotifCount}</span>
               )}
             </button>
           ))}
@@ -209,6 +235,9 @@ function App() {
               </button>
             );
           }
+          const showDot = (n.badge === true && pendingOrdersCount > 0) ||
+                          (n.badge === "notif" && openNotifCount > 0);
+          const dotColor = n.badge === "notif" ? "var(--warn, #c08a3e)" : "var(--danger)";
           return (
             <button
               key={n.id}
@@ -217,8 +246,8 @@ function App() {
               style={{position: "relative"}}
             >
               <Icon name={n.icon} />
-              {n.badge && pendingOrdersCount > 0 && (
-                <span style={{position: "absolute", top: 4, right: 22, width: 8, height: 8, borderRadius: 4, background: "var(--danger)"}} />
+              {showDot && (
+                <span style={{position: "absolute", top: 4, right: 22, width: 8, height: 8, borderRadius: 4, background: dotColor}} />
               )}
               <span>{n.label}</span>
             </button>
@@ -245,6 +274,22 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Yeni bildirim uyarı modal'ı (login sonrası ilk kez) */}
+      {notifAlert && notifAlert.length > 0 && (
+        <NotifAlertModal
+          notifications={notifAlert}
+          onGo={() => {
+            markNotificationsSeen(user.username);
+            setNotifAlert(null);
+            navigate("bildirimler");
+          }}
+          onDismiss={() => {
+            markNotificationsSeen(user.username);
+            setNotifAlert(null);
+          }}
+        />
       )}
 
       {/* Tweaks panel */}

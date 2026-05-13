@@ -11,7 +11,7 @@ try {
   process.exit(1);
 }
 
-const ORDER = ["data.jsx", "login.jsx", "dashboard.jsx", "stock.jsx", "screens.jsx", "app.jsx"];
+const ORDER = ["data.jsx", "login.jsx", "dashboard.jsx", "stock.jsx", "screens.jsx", "notifications.jsx", "app.jsx"];
 
 const parts = ORDER.map((f) => {
   const p = path.join(__dirname, f);
@@ -28,7 +28,7 @@ const styleEl = document.getElementById("__runtime-styles");
 if (styleEl) {
   styleEl.textContent = [
     window.LOGIN_STYLES, window.DASHBOARD_STYLES, window.STOCK_STYLES,
-    window.SCREEN_STYLES, window.SHELL_STYLES,
+    window.SCREEN_STYLES, window.NOTIF_STYLES, window.SHELL_STYLES,
   ].filter(Boolean).join("\\n");
 }
 const root = ReactDOM.createRoot(document.getElementById("root"));

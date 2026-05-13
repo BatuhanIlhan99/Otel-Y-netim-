@@ -962,7 +962,351 @@ function _extends(){return _extends=Object.assign?Object.assign.bind():function(
 .status-row svg { flex-shrink: 0; margin-top: 2px; }
 .status-row strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink-900); }
 .status-row small { display: block; font-size: 12px; color: var(--ink-500); margin-top: 1px; }
-`;Object.assign(window,{Orders,Reports,AdminProducts,AdminUsers,MailSettings,SCREEN_STYLES:screenStyles});const NAV_ITEMS=[{id:"dashboard",label:"Komuta Paneli",icon:"dashboard",roles:["admin","departman"]},{id:"stock",label:"Stok Sayım",icon:"stock",roles:["admin","departman"]},{id:"orders",label:"Sipariş Talepleri",icon:"orders",roles:["admin","departman"],badge:"danger"},{id:"reports",label:"Günlük Rapor",icon:"reports",roles:["admin"]}];const ADMIN_NAV=[{id:"products",label:"Ürün Yönetimi",icon:"products",roles:["admin"]},{id:"users",label:"Kullanıcı Yönetimi",icon:"user",roles:["admin"]},{id:"mail",label:"Mail & Otomasyon",icon:"mail",roles:["admin"]}];const MOBILE_NAV=[{id:"dashboard",label:"Panel",icon:"dashboard"},{id:"stock",label:"Sayım",icon:"stock"},{id:"orders",label:"Sipariş",icon:"orders",badge:true},{id:"reports",label:"Rapor",icon:"reports"},{id:"more",label:"Daha",icon:"more"}];function App(){const[user,setUser]=React.useState(null);const[route,setRoute]=React.useState("dashboard");const[stockDept,setStockDept]=React.useState(null);const[moreOpen,setMoreOpen]=React.useState(false);const[tweaksOpen,setTweaksOpen]=React.useState(false);const[tweaks,setTweaks]=React.useState({accent:"#c08a3e",brand:"#0d6e5e",density:"balanced",radius:"soft",sidebar:"dark"});React.useEffect(()=>{function onMsg(e){if(e.data?.type==="__activate_edit_mode")setTweaksOpen(true);if(e.data?.type==="__deactivate_edit_mode")setTweaksOpen(false);}window.addEventListener("message",onMsg);window.parent.postMessage({type:"__edit_mode_available"},"*");return()=>window.removeEventListener("message",onMsg);},[]);React.useEffect(()=>{const root=document.documentElement;root.style.setProperty("--brand",tweaks.brand);root.style.setProperty("--accent",tweaks.accent);if(tweaks.density==="compact"){root.style.setProperty("--r-md","8px");root.style.setProperty("--r-lg","10px");}else if(tweaks.density==="airy"){root.style.setProperty("--r-md","14px");root.style.setProperty("--r-lg","18px");}else{root.style.setProperty("--r-md","12px");root.style.setProperty("--r-lg","16px");}const rmap={sharp:{sm:"4px",md:"6px",lg:"8px"},soft:{sm:"8px",md:"12px",lg:"16px"},round:{sm:"12px",md:"18px",lg:"24px"}}[tweaks.radius];root.style.setProperty("--r-sm",rmap.sm);root.style.setProperty("--r-md",rmap.md);root.style.setProperty("--r-lg",rmap.lg);if(tweaks.sidebar==="light"){root.style.setProperty("--rail-bg","#ffffff");root.style.setProperty("--rail-bg-2","#f4f6f4");root.style.setProperty("--rail-text","#2f3d3a");root.style.setProperty("--rail-text-strong","#0d1815");root.style.setProperty("--rail-muted","#6b7975");root.style.setProperty("--rail-line","#e7eae8");root.style.setProperty("--rail-hover","#f0f3f1");root.style.setProperty("--rail-active","#e6f0ed");}else{root.style.setProperty("--rail-bg","#0f221e");root.style.setProperty("--rail-bg-2","#0a1916");root.style.setProperty("--rail-text","#d8e3df");root.style.setProperty("--rail-text-strong","#ffffff");root.style.setProperty("--rail-muted","#94a59f");root.style.setProperty("--rail-line","rgba(255,255,255,0.08)");root.style.setProperty("--rail-hover","rgba(255,255,255,0.06)");root.style.setProperty("--rail-active","rgba(255,255,255,0.12)");}},[tweaks]);if(!user){return React.createElement(LoginScreen,{onLogin:u=>{setUser(u);setRoute("dashboard");}});}function navigate(target,payload){if(target==="stock"&&payload)setStockDept(payload);setRoute(target);setMoreOpen(false);}let currentScreen;switch(route){case"dashboard":currentScreen=React.createElement(Dashboard,{currentUser:user,onNavigate:navigate});break;case"stock":currentScreen=React.createElement(StockCount,{currentUser:user,selectedDept:stockDept,onNavigate:navigate});break;case"orders":currentScreen=React.createElement(Orders,{currentUser:user,onNavigate:navigate});break;case"reports":currentScreen=React.createElement(Reports,{onNavigate:navigate});break;case"products":currentScreen=React.createElement(AdminProducts,{onNavigate:navigate});break;case"users":currentScreen=React.createElement(AdminUsers,null);break;case"mail":currentScreen=React.createElement(MailSettings,null);break;default:currentScreen=React.createElement(Dashboard,{currentUser:user,onNavigate:navigate});}const allNav=[...NAV_ITEMS,...ADMIN_NAV].filter(n=>n.roles.includes(user.role));const pendingOrdersCount=ORDER_REQUESTS.filter(o=>o.status==="pending").length;return React.createElement("div",{className:"app-shell"},React.createElement("aside",{className:"rail"},React.createElement("div",{className:"rail-brand"},React.createElement("div",{className:"rail-mark"},"OY"),React.createElement("div",{className:"rail-brand-text"},React.createElement("strong",null,"Otel Y\xF6netim"),React.createElement("small",null,"G\xFClplaj Resort"))),React.createElement("nav",{className:"rail-nav"},React.createElement("div",{className:"rail-section-label"},"Operasyon"),NAV_ITEMS.filter(n=>n.roles.includes(user.role)).map(n=>React.createElement("button",{key:n.id,className:`rail-link ${route===n.id?"active":""}`,onClick:()=>navigate(n.id)},React.createElement(Icon,{name:n.icon,size:17}),n.label,n.id==="orders"&&pendingOrdersCount>0&&React.createElement("span",{className:"rail-badge"},pendingOrdersCount)))),user.role==="admin"&&React.createElement("nav",{className:"rail-nav"},React.createElement("div",{className:"rail-section-label"},"Y\xF6netici"),ADMIN_NAV.map(n=>React.createElement("button",{key:n.id,className:`rail-link ${route===n.id?"active":""}`,onClick:()=>navigate(n.id)},React.createElement(Icon,{name:n.icon,size:17}),n.label))),React.createElement("div",{className:"rail-user"},React.createElement("div",{className:"rail-avatar"},initials(user.name)),React.createElement("div",{className:"rail-user-info"},React.createElement("strong",null,user.name),React.createElement("small",null,user.role==="admin"?"Yönetici":deptById(user.department)?.name)),React.createElement("button",{onClick:()=>setUser(null),title:"\xC7\u0131k\u0131\u015F"},React.createElement(Icon,{name:"logout",size:14})))),React.createElement("div",{className:"mobile-topbar"},React.createElement("div",{className:"mobile-brand"},React.createElement("div",{className:"rail-mark"},"OY"),React.createElement("strong",null,"Otel Y\xF6netim")),React.createElement("div",{className:"mobile-topbar-actions"},React.createElement("button",{className:"mobile-icon-btn"},React.createElement(Icon,{name:"bell"}),React.createElement("span",{className:"dot"})),React.createElement("button",{className:"mobile-icon-btn",onClick:()=>setUser(null),title:"\xC7\u0131k\u0131\u015F"},React.createElement(Icon,{name:"logout"})))),React.createElement("main",{className:"main"},currentScreen),React.createElement("nav",{className:"mobile-nav"},MOBILE_NAV.map(n=>{if(n.id==="more"){return React.createElement("button",{key:n.id,className:moreOpen?"on":"",onClick:()=>setMoreOpen(o=>!o)},React.createElement(Icon,{name:"menu"}),React.createElement("span",null,n.label));}return React.createElement("button",{key:n.id,className:route===n.id?"on":"",onClick:()=>navigate(n.id),style:{position:"relative"}},React.createElement(Icon,{name:n.icon}),n.badge&&pendingOrdersCount>0&&React.createElement("span",{style:{position:"absolute",top:4,right:22,width:8,height:8,borderRadius:4,background:"var(--danger)"}}),React.createElement("span",null,n.label));})),moreOpen&&React.createElement("div",{className:"more-sheet",onClick:()=>setMoreOpen(false)},React.createElement("div",{className:"more-sheet-content",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"more-sheet-handle"}),React.createElement("div",{className:"more-sheet-title"},"Daha fazla"),user.role==="admin"&&ADMIN_NAV.map(n=>React.createElement("button",{key:n.id,className:"more-sheet-item",onClick:()=>navigate(n.id)},React.createElement("div",{className:"more-sheet-icon"},React.createElement(Icon,{name:n.icon})),React.createElement("span",null,n.label),React.createElement(Icon,{name:"arrow_right",size:14}))),React.createElement("button",{className:"more-sheet-item danger",onClick:()=>setUser(null)},React.createElement("div",{className:"more-sheet-icon"},React.createElement(Icon,{name:"logout"})),React.createElement("span",null,"\xC7\u0131k\u0131\u015F yap")))),tweaksOpen&&React.createElement(TweaksPanel,{tweaks:tweaks,setTweaks:setTweaks,onClose:()=>{setTweaksOpen(false);window.parent.postMessage({type:"__edit_mode_dismissed"},"*");}}));}function TweaksPanel({tweaks,setTweaks,onClose}){function update(key,value){setTweaks(t=>({...t,[key]:value}));}const brandSwatches=[{name:"Zümrüt",value:"#0d6e5e"},{name:"Lacivert",value:"#1c3d6e"},{name:"Bordo",value:"#7a2e3e"},{name:"Kömür",value:"#2a2e2e"}];const accentSwatches=[{name:"Altın",value:"#c08a3e"},{name:"Bakır",value:"#b06030"},{name:"Şampanya",value:"#a89060"},{name:"Hardal",value:"#a18030"}];return React.createElement("div",{className:"tweaks-panel"},React.createElement("div",{className:"tweaks-head"},React.createElement("strong",null,"Tweaks"),React.createElement("button",{onClick:onClose},React.createElement(Icon,{name:"x",size:16}))),React.createElement("div",{className:"tweaks-body"},React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Marka rengi"),React.createElement("div",{className:"swatch-row"},brandSwatches.map(s=>React.createElement("button",{key:s.value,className:`swatch ${tweaks.brand===s.value?"on":""}`,style:{background:s.value},onClick:()=>update("brand",s.value),title:s.name})))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Aksan rengi"),React.createElement("div",{className:"swatch-row"},accentSwatches.map(s=>React.createElement("button",{key:s.value,className:`swatch ${tweaks.accent===s.value?"on":""}`,style:{background:s.value},onClick:()=>update("accent",s.value),title:s.name})))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Yo\u011Funluk"),React.createElement("div",{className:"segmented",style:{width:"100%"}},[{id:"compact",label:"Kompakt"},{id:"balanced",label:"Dengeli"},{id:"airy",label:"Ferah"}].map(o=>React.createElement("button",{key:o.id,className:tweaks.density===o.id?"on":"",onClick:()=>update("density",o.id),style:{flex:1}},o.label)))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"K\xF6\u015Fe yuvarlakl\u0131\u011F\u0131"),React.createElement("div",{className:"segmented",style:{width:"100%"}},[{id:"sharp",label:"Keskin"},{id:"soft",label:"Yumuşak"},{id:"round",label:"Yuvarlak"}].map(o=>React.createElement("button",{key:o.id,className:tweaks.radius===o.id?"on":"",onClick:()=>update("radius",o.id),style:{flex:1}},o.label)))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Sidebar"),React.createElement("div",{className:"segmented",style:{width:"100%"}},React.createElement("button",{className:tweaks.sidebar==="dark"?"on":"",onClick:()=>update("sidebar","dark"),style:{flex:1}},"Koyu"),React.createElement("button",{className:tweaks.sidebar==="light"?"on":"",onClick:()=>update("sidebar","light"),style:{flex:1}},"A\xE7\u0131k")))));}const shellExtraStyles=`
+`;Object.assign(window,{Orders,Reports,AdminProducts,AdminUsers,MailSettings,SCREEN_STYLES:screenStyles});const PRIORITY_OPTIONS=[{id:"low",label:"Düşük",cls:"badge-ghost"},{id:"normal",label:"Normal",cls:"badge-info"},{id:"urgent",label:"Acil",cls:"badge-danger"}];const STATUS_OPTIONS=[{id:"open",label:"Açık",cls:"badge-warn"},{id:"in_progress",label:"İşlemde",cls:"badge-brand"},{id:"resolved",label:"Çözüldü",cls:"badge-ok"}];function notifPriorityMeta(id){return PRIORITY_OPTIONS.find(p=>p.id===id)||PRIORITY_OPTIONS[1];}function notifStatusMeta(id){return STATUS_OPTIONS.find(s=>s.id===id)||STATUS_OPTIONS[0];}function fmtNotifTime(iso){if(!iso)return"";try{const d=new Date(iso);const today=new Date();const sameDay=d.toDateString()===today.toDateString();const time=d.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});if(sameDay)return`Bugün, ${time}`;const yesterday=new Date(today);yesterday.setDate(today.getDate()-1);if(d.toDateString()===yesterday.toDateString())return`Dün, ${time}`;return d.toLocaleDateString("tr-TR",{day:"2-digit",month:"short"})+`, ${time}`;}catch{return"";}}function resizeImageFile(file,maxSize=1024,quality=0.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error);reader.onload=ev=>{const img=new Image();img.onerror=()=>reject(new Error("Görsel okunamadı"));img.onload=()=>{let w=img.width,h=img.height;if(w>maxSize||h>maxSize){const r=w>h?maxSize/w:maxSize/h;w=Math.round(w*r);h=Math.round(h*r);}const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);resolve(canvas.toDataURL("image/jpeg",quality));};img.src=ev.target.result;};reader.readAsDataURL(file);});}function emptyForm(){return{title:"",desc:"",targetDept:"temizlik",location:"",priority:"normal",photo:null};}function visibleNotifications(items,user){if(!user)return[];if(user.role==="admin")return items;return items.filter(n=>n.targetDept===user.department||n.createdBy?.username===user.username);}function openNotificationCount(items,user){return visibleNotifications(items,user).filter(n=>n.status!=="resolved").length;}function getLastSeenAt(username){if(!username)return null;const seen=lsLoad("notifications-seen",{});return seen[username]||null;}function markNotificationsSeen(username,atIso){if(!username)return;const seen=lsLoad("notifications-seen",{});seen[username]=atIso||new Date().toISOString();lsSave("notifications-seen",seen);}function newNotificationsForUser(items,user,sinceIso){if(!user)return[];return visibleNotifications(items,user).filter(n=>{if(n.status==="resolved")return false;if(n.createdBy?.username===user.username)return false;if(sinceIso&&n.createdAt&&n.createdAt<=sinceIso)return false;if(user.role!=="admin"&&n.targetDept!==user.department)return false;return true;});}function NotifAlertModal({notifications,onGo,onDismiss}){if(!notifications||notifications.length===0)return null;const PRI_RANK={urgent:0,normal:1,low:2};const sorted=[...notifications].sort((a,b)=>{const pa=PRI_RANK[a.priority]??1;const pb=PRI_RANK[b.priority]??1;if(pa!==pb)return pa-pb;return(b.createdAt||"").localeCompare(a.createdAt||"");});const top=sorted[0];const rest=sorted.slice(1,3);const remaining=Math.max(0,sorted.length-3);const topPri=notifPriorityMeta(top.priority);const target=deptById(top.targetDept);const urgentCount=sorted.filter(n=>n.priority==="urgent").length;return React.createElement("div",{className:"notif-alert-overlay",onClick:onDismiss},React.createElement("div",{className:"notif-alert-card",onClick:e=>e.stopPropagation(),role:"dialog"},React.createElement("div",{className:"notif-alert-icon"},React.createElement(Icon,{name:"bell",size:26}),sorted.length>0&&React.createElement("span",{className:"notif-alert-count"},sorted.length)),React.createElement("div",{className:"notif-alert-titles"},React.createElement("h2",null,sorted.length===1?"Sana yeni bir bildirim var":`${sorted.length} yeni bildirim var`),React.createElement("p",null,urgentCount>0?`${urgentCount} tanesi acil. Departmanına gelen aksiyon bekleyen bildirimler.`:"Departmanına gelen, henüz işleme alınmamış bildirimler.")),React.createElement("div",{className:"notif-alert-preview"},React.createElement("div",{className:"notif-alert-preview-head"},React.createElement("span",{className:`badge ${topPri.cls}`},topPri.label),React.createElement("strong",null,top.title)),React.createElement("small",null,top.location&&React.createElement(React.Fragment,null,top.location," \xB7 "),target?.name||top.targetDept," \xB7 ",top.createdBy?.name||"Bilinmiyor"," \xB7 ",fmtNotifTime(top.createdAt)),rest.length>0&&React.createElement("ul",{className:"notif-alert-rest"},rest.map(n=>React.createElement("li",{key:n.id},React.createElement("span",{className:`badge ${notifPriorityMeta(n.priority).cls}`},notifPriorityMeta(n.priority).label),React.createElement("span",null,n.title))),remaining>0&&React.createElement("li",{className:"muted"},"+",remaining," bildirim daha"))),React.createElement("div",{className:"notif-alert-foot"},React.createElement("button",{className:"btn btn-ghost",onClick:onDismiss},"Daha sonra"),React.createElement("button",{className:"btn",onClick:onGo},"Bildirime git ",React.createElement(Icon,{name:"arrow_right",size:14})))));}function Notifications({currentUser}){const[items,setItems]=React.useState(()=>lsLoad("notifications",[]));const[filter,setFilter]=React.useState("open");const[deptFilter,setDeptFilter]=React.useState("all");const[showForm,setShowForm]=React.useState(false);const[selected,setSelected]=React.useState(null);const[form,setForm]=React.useState(emptyForm);const[photoBusy,setPhotoBusy]=React.useState(false);const[error,setError]=React.useState("");function persist(next){setItems(next);lsSave("notifications",next);}function createNotification(e){e?.preventDefault();setError("");const title=form.title.trim();if(!title){setError("Başlık zorunlu.");return;}const now=new Date().toISOString();const n={id:`n-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,createdAt:now,createdBy:{id:currentUser.id,name:currentUser.name,username:currentUser.username,department:currentUser.department,role:currentUser.role},targetDept:form.targetDept,title,desc:form.desc.trim(),location:form.location.trim(),priority:form.priority,photo:form.photo||null,status:"open",history:[{at:now,by:currentUser.name,action:"created"}]};persist([n,...items]);setForm(emptyForm());setShowForm(false);}function changeStatus(id,status){const now=new Date().toISOString();const next=items.map(n=>{if(n.id!==id)return n;const updated={...n,status,history:[...(n.history||[]),{at:now,by:currentUser.name,action:status}]};if(status==="resolved"){updated.resolvedAt=now;updated.resolvedBy=currentUser.name;}return updated;});persist(next);if(selected?.id===id){setSelected(next.find(x=>x.id===id));}}function removeNotification(id){if(!window.confirm("Bu bildirim silinsin mi?"))return;persist(items.filter(n=>n.id!==id));if(selected?.id===id)setSelected(null);}async function handlePhoto(e){const file=e.target.files?.[0];if(!file)return;setPhotoBusy(true);try{const dataUrl=await resizeImageFile(file);setForm(f=>({...f,photo:dataUrl}));}catch(err){setError("Görsel yüklenemedi.");}finally{setPhotoBusy(false);e.target.value="";}}const visible=visibleNotifications(items,currentUser);const filtered=visible.filter(n=>{if(filter!=="all"&&n.status!==filter)return false;if(deptFilter!=="all"&&n.targetDept!==deptFilter)return false;return true;});const PRI_RANK={urgent:0,normal:1,low:2};filtered.sort((a,b)=>{const pa=PRI_RANK[a.priority]??1;const pb=PRI_RANK[b.priority]??1;if(pa!==pb)return pa-pb;return(b.createdAt||"").localeCompare(a.createdAt||"");});const counts={open:visible.filter(n=>n.status==="open").length,in_progress:visible.filter(n=>n.status==="in_progress").length,resolved:visible.filter(n=>n.status==="resolved").length,urgent:visible.filter(n=>n.priority==="urgent"&&n.status!=="resolved").length,total:visible.length};React.useEffect(()=>{if(selected&&!items.find(n=>n.id===selected.id)){setSelected(null);}},[items,selected]);return React.createElement("div",{className:"col gap-lg notif-screen","data-screen-label":"06 Bildirimler"},React.createElement("header",{className:"page-head"},React.createElement("div",{className:"page-head-titles"},React.createElement("span",{className:"eyebrow"},"Operasyon"),React.createElement("h1",{className:"page-title"},"Bildirimler"),React.createElement("span",{className:"page-sub"},"Otelde g\xF6rd\xFC\u011F\xFCn eksiklik veya ar\u0131zay\u0131 ilgili departmana ilet")),React.createElement("div",{className:"page-head-meta"},React.createElement("button",{className:"btn",onClick:()=>{setShowForm(s=>!s);setError("");}},React.createElement(Icon,{name:showForm?"x":"plus",size:15}),showForm?"İptal":"Yeni bildirim"))),React.createElement("div",{className:"kpi-grid"},React.createElement(Kpi,{icon:"bell",iconCls:"warn",label:"A\xE7\u0131k",value:counts.open,suffix:"bildirim",foot:"Hen\xFCz i\u015Fleme al\u0131nmam\u0131\u015F"}),React.createElement(Kpi,{icon:"clock",iconCls:"brand",label:"\u0130\u015Flemde",value:counts.in_progress,suffix:"bildirim",foot:"Sorumlular \xE7\xF6z\xFCyor"}),React.createElement(Kpi,{icon:"alert",iconCls:"danger",label:"Acil & a\xE7\u0131k",value:counts.urgent,suffix:"kalem",foot:"Bekletme!"}),React.createElement(Kpi,{icon:"check",iconCls:"ok",label:"\xC7\xF6z\xFCld\xFC",value:counts.resolved,suffix:"bildirim",foot:"Toplam ge\xE7mi\u015F"})),showForm&&React.createElement("div",{className:"card card-elev notif-form-card"},React.createElement("div",{className:"card-head"},React.createElement("div",{className:"card-head-titles"},React.createElement("div",{className:"card-title"},"Yeni eksiklik / ar\u0131za bildirimi"),React.createElement("div",{className:"card-sub"},"Hangi departman\u0131n \xE7\xF6zmesi gerekiyor onu i\u015Faretle"))),React.createElement("form",{className:"notif-form",onSubmit:createNotification},React.createElement("div",{className:"notif-form-row"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"Ba\u015Fl\u0131k",React.createElement("span",{className:"req"},"*")),React.createElement("input",{className:"input",type:"text",value:form.title,onChange:e=>setForm(f=>({...f,title:e.target.value})),placeholder:"\xD6rn. Lobi tuvaletinde sabun yok",maxLength:80,autoFocus:true})),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"Hedef departman"),React.createElement("select",{className:"input",value:form.targetDept,onChange:e=>setForm(f=>({...f,targetDept:e.target.value}))},DEPARTMENTS.map(d=>React.createElement("option",{key:d.id,value:d.id},d.name))))),React.createElement("div",{className:"notif-form-row"},React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"Konum / yer"),React.createElement("input",{className:"input",type:"text",value:form.location,onChange:e=>setForm(f=>({...f,location:e.target.value})),placeholder:"\xD6rn. Lobi ortak tuvalet, 203 oda, Restorant giri\u015Fi",maxLength:80})),React.createElement("div",{className:"field"},React.createElement("span",{className:"field-label"},"\xD6ncelik"),React.createElement("div",{className:"segmented notif-priority-seg"},PRIORITY_OPTIONS.map(p=>React.createElement("button",{type:"button",key:p.id,className:form.priority===p.id?"on":"",onClick:()=>setForm(f=>({...f,priority:p.id}))},p.label))))),React.createElement("label",{className:"field"},React.createElement("span",{className:"field-label"},"A\xE7\u0131klama"),React.createElement("textarea",{className:"input",rows:3,value:form.desc,onChange:e=>setForm(f=>({...f,desc:e.target.value})),placeholder:"Detay yazabilirsin (zorunlu de\u011Fil)"})),React.createElement("div",{className:"notif-photo-row"},React.createElement("label",{className:"btn btn-soft btn-sm notif-photo-btn"},React.createElement(Icon,{name:"package",size:14}),form.photo?"Fotoğrafı değiştir":"Fotoğraf ekle",React.createElement("input",{type:"file",accept:"image/*",capture:"environment",onChange:handlePhoto,style:{display:"none"}})),photoBusy&&React.createElement("span",{className:"muted"},"G\xF6rsel haz\u0131rlan\u0131yor..."),form.photo&&React.createElement("div",{className:"notif-photo-preview"},React.createElement("img",{src:form.photo,alt:"\xD6nizleme"}),React.createElement("button",{type:"button",className:"notif-photo-remove",onClick:()=>setForm(f=>({...f,photo:null}))},React.createElement(Icon,{name:"x",size:12})))),error&&React.createElement("div",{className:"notice danger"},React.createElement(Icon,{name:"alert"}),React.createElement("div",{className:"notice-body"},error)),React.createElement("div",{className:"notif-form-foot"},React.createElement("button",{type:"button",className:"btn btn-ghost",onClick:()=>{setShowForm(false);setForm(emptyForm());setError("");}},"Vazge\xE7"),React.createElement("button",{type:"submit",className:"btn"},React.createElement(Icon,{name:"send",size:14}),"Bildirim g\xF6nder")))),React.createElement("div",{className:"card card-elev"},React.createElement("div",{className:"card-head"},React.createElement("div",{className:"card-head-titles"},React.createElement("div",{className:"card-title"},currentUser.role==="admin"?"Tüm bildirimler":"Departmanına gelen bildirimler"),React.createElement("div",{className:"card-sub"},counts.total," bildirim \xB7 ",counts.open," a\xE7\u0131k")),React.createElement("div",{className:"filter-chips"},React.createElement("button",{className:`chip warn ${filter==="open"?"on":""}`,onClick:()=>setFilter("open")},"A\xE7\u0131k ",React.createElement("strong",null,counts.open)),React.createElement("button",{className:`chip ${filter==="in_progress"?"on":""}`,onClick:()=>setFilter("in_progress")},"\u0130\u015Flemde ",React.createElement("strong",null,counts.in_progress)),React.createElement("button",{className:`chip ${filter==="resolved"?"on":""}`,onClick:()=>setFilter("resolved")},"\xC7\xF6z\xFCld\xFC ",React.createElement("strong",null,counts.resolved)),React.createElement("button",{className:`chip ${filter==="all"?"on":""}`,onClick:()=>setFilter("all")},"T\xFCm\xFC ",React.createElement("strong",null,counts.total)))),currentUser.role==="admin"&&React.createElement("div",{className:"notif-dept-filter"},React.createElement("button",{className:`chip ${deptFilter==="all"?"on":""}`,onClick:()=>setDeptFilter("all")},"T\xFCm departmanlar"),DEPARTMENTS.map(d=>React.createElement("button",{key:d.id,className:`chip ${deptFilter===d.id?"on":""}`,onClick:()=>setDeptFilter(d.id)},d.name))),React.createElement("div",{className:"notif-list"},filtered.length===0&&React.createElement("div",{className:"notif-empty"},React.createElement(Icon,{name:"bell",size:26}),React.createElement("strong",null,"Bu filtreye uyan bildirim yok"),React.createElement("small",null,"Yeni bir bildirim a\xE7mak i\xE7in sa\u011F \xFCstteki \"Yeni bildirim\" d\xFC\u011Fmesini kullan.")),filtered.map(n=>{const pri=notifPriorityMeta(n.priority);const st=notifStatusMeta(n.status);const target=deptById(n.targetDept);const isSelected=selected?.id===n.id;return React.createElement("div",{key:n.id,className:`notif-card ${isSelected?"selected":""} ${n.priority==="urgent"&&n.status!=="resolved"?"urgent":""}`,onClick:()=>setSelected(isSelected?null:n)},React.createElement("div",{className:"notif-card-head"},React.createElement("div",{className:"notif-card-titles"},React.createElement("strong",null,n.title),React.createElement("small",null,n.location&&React.createElement(React.Fragment,null,React.createElement(Icon,{name:"building",size:11,style:{verticalAlign:"middle",marginRight:4}}),n.location," \xB7 "),"Hedef: ",React.createElement("span",{style:{color:"var(--brand)"}},target?.name||n.targetDept))),React.createElement("div",{className:"notif-card-badges"},React.createElement("span",{className:`badge ${pri.cls}`},pri.label),React.createElement("span",{className:`badge ${st.cls}`},st.label))),React.createElement("div",{className:"notif-card-meta"},React.createElement("span",{className:"muted"},React.createElement(Icon,{name:"user",size:12,style:{verticalAlign:"middle",marginRight:3}}),n.createdBy?.name||"Bilinmiyor"," \xB7 ",fmtNotifTime(n.createdAt)),n.photo&&React.createElement("span",{className:"muted notif-photo-chip"},React.createElement(Icon,{name:"eye",size:12,style:{verticalAlign:"middle",marginRight:3}}),"Foto\u011Fraf var")),isSelected&&React.createElement("div",{className:"notif-card-detail",onClick:e=>e.stopPropagation()},n.desc&&React.createElement("p",{className:"notif-card-desc"},n.desc),n.photo&&React.createElement("div",{className:"notif-card-photo"},React.createElement("img",{src:n.photo,alt:"Bildirim g\xF6rseli"})),n.history&&n.history.length>0&&React.createElement("div",{className:"notif-history"},React.createElement("div",{className:"notif-history-title"},"Ge\xE7mi\u015F"),n.history.map((h,idx)=>React.createElement("div",{key:idx,className:"notif-history-row"},React.createElement(Icon,{name:"clock",size:11}),React.createElement("span",null,fmtNotifTime(h.at)," \xB7 ",h.by),React.createElement("span",{className:"muted"},h.action==="created"&&"açtı",h.action==="in_progress"&&"işleme aldı",h.action==="resolved"&&"çözdü",h.action==="open"&&"yeniden açtı")))),React.createElement("div",{className:"notif-card-actions"},n.status==="open"&&React.createElement("button",{className:"btn btn-sm",onClick:()=>changeStatus(n.id,"in_progress")},React.createElement(Icon,{name:"clock",size:13}),"\u0130\u015Fleme al"),n.status==="in_progress"&&React.createElement("button",{className:"btn btn-sm",onClick:()=>changeStatus(n.id,"resolved")},React.createElement(Icon,{name:"check",size:13}),"\xC7\xF6z\xFCld\xFC"),n.status==="resolved"&&React.createElement("button",{className:"btn btn-ghost btn-sm",onClick:()=>changeStatus(n.id,"open")},React.createElement(Icon,{name:"refresh",size:13}),"Yeniden a\xE7"),(currentUser.role==="admin"||n.createdBy?.username===currentUser.username)&&React.createElement("button",{className:"btn btn-ghost btn-sm danger",onClick:()=>removeNotification(n.id)},React.createElement(Icon,{name:"trash",size:13}),"Sil"))));}))));}const notifStyles=`
+.notif-screen .req { color: var(--danger); margin-left: 2px; }
+
+.notif-form-card .notif-form {
+  padding: 0 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.notif-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) {
+  .notif-form-row { grid-template-columns: 1fr; }
+}
+.notif-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notif-form .field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700);
+}
+.notif-form .input,
+.notif-form select.input,
+.notif-form textarea.input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 8px);
+  background: var(--surface);
+  color: var(--ink-900);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.notif-form .input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13, 110, 94, 0.12);
+}
+.notif-priority-seg { display: flex; gap: 0; }
+.notif-priority-seg button { flex: 1; }
+
+.notif-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.notif-photo-btn { cursor: pointer; }
+.notif-photo-preview {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border-radius: var(--r-sm, 8px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.notif-photo-preview img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.notif-photo-remove {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(13, 24, 21, 0.75);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.notif-form-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.notif-dept-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 18px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 18px;
+}
+
+.notif-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 12px);
+  background: var(--surface);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+}
+.notif-card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 2px 8px rgba(13, 24, 21, 0.06);
+}
+.notif-card.selected {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(13, 110, 94, 0.18);
+}
+.notif-card.urgent {
+  border-left: 3px solid var(--danger);
+}
+
+.notif-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.notif-card-titles { flex: 1; min-width: 0; }
+.notif-card-titles strong {
+  display: block;
+  font-size: 14.5px;
+  color: var(--ink-900);
+  margin-bottom: 3px;
+}
+.notif-card-titles small {
+  color: var(--ink-600);
+  font-size: 12px;
+}
+.notif-card-badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.notif-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.notif-photo-chip { display: inline-flex; align-items: center; }
+
+.notif-card-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: default;
+}
+.notif-card-desc {
+  font-size: 13px;
+  color: var(--ink-700);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin: 0;
+}
+.notif-card-photo img {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--line);
+}
+
+.notif-history {
+  background: var(--surface-soft);
+  border-radius: var(--r-sm, 8px);
+  padding: 10px 12px;
+}
+.notif-history-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  margin-bottom: 6px;
+}
+.notif-history-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-700);
+  padding: 2px 0;
+}
+
+.notif-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.notif-card-actions .btn.danger {
+  color: var(--danger);
+  margin-left: auto;
+}
+
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 18px;
+  text-align: center;
+  color: var(--ink-600);
+}
+.notif-empty strong { font-size: 14px; color: var(--ink-800); }
+.notif-empty small { font-size: 12.5px; }
+
+/* ===== Login sonrası uyarı modal ===== */
+.notif-alert-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 24, 21, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 200;
+  padding: 18px;
+  animation: notifFade 0.18s ease-out;
+}
+@keyframes notifFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.notif-alert-card {
+  width: min(460px, 100%);
+  background: var(--surface);
+  border-radius: var(--r-lg, 16px);
+  box-shadow: 0 20px 60px rgba(13, 24, 21, 0.35);
+  padding: 28px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  animation: notifPop 0.22s cubic-bezier(0.2, 1, 0.3, 1);
+}
+@keyframes notifPop {
+  from { transform: translateY(12px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.notif-alert-icon {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--warn-soft, rgba(192, 138, 62, 0.14));
+  color: var(--accent-strong, #8a5e1e);
+  display: grid;
+  place-items: center;
+}
+.notif-alert-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface);
+}
+
+.notif-alert-titles h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+.notif-alert-titles p {
+  margin: 5px 0 0;
+  color: var(--ink-600);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.notif-alert-preview {
+  width: 100%;
+  background: var(--surface-soft, #f5f7f5);
+  border-radius: var(--r-md, 12px);
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--line-soft, rgba(0,0,0,0.05));
+}
+.notif-alert-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.notif-alert-preview-head strong {
+  font-size: 14px;
+  color: var(--ink-900);
+}
+.notif-alert-preview small {
+  color: var(--ink-600);
+  font-size: 12px;
+}
+.notif-alert-rest {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line-soft, rgba(0,0,0,0.06));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.notif-alert-rest li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-700);
+}
+.notif-alert-rest li.muted { color: var(--ink-500); font-style: italic; }
+
+.notif-alert-foot {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+@media (max-width: 460px) {
+  .notif-alert-foot { flex-direction: column-reverse; }
+  .notif-alert-foot .btn { width: 100%; justify-content: center; }
+}
+`;Object.assign(window,{Notifications,NotifAlertModal,NOTIF_STYLES:notifStyles,openNotificationCount,visibleNotifications,newNotificationsForUser,getLastSeenAt,markNotificationsSeen});const NAV_ITEMS=[{id:"dashboard",label:"Komuta Paneli",icon:"dashboard",roles:["admin","departman"]},{id:"stock",label:"Stok Sayım",icon:"stock",roles:["admin","departman"]},{id:"orders",label:"Sipariş Talepleri",icon:"orders",roles:["admin","departman"],badge:"danger"},{id:"bildirimler",label:"Bildirimler",icon:"bell",roles:["admin","departman"],badge:"warn"},{id:"reports",label:"Günlük Rapor",icon:"reports",roles:["admin"]}];const ADMIN_NAV=[{id:"products",label:"Ürün Yönetimi",icon:"products",roles:["admin"]},{id:"users",label:"Kullanıcı Yönetimi",icon:"user",roles:["admin"]},{id:"mail",label:"Mail & Otomasyon",icon:"mail",roles:["admin"]}];const MOBILE_NAV=[{id:"dashboard",label:"Panel",icon:"dashboard"},{id:"stock",label:"Sayım",icon:"stock"},{id:"bildirimler",label:"Bildirim",icon:"bell",badge:"notif"},{id:"orders",label:"Sipariş",icon:"orders",badge:true},{id:"more",label:"Daha",icon:"more"}];function App(){const[user,setUser]=React.useState(null);const[route,setRoute]=React.useState("dashboard");const[stockDept,setStockDept]=React.useState(null);const[moreOpen,setMoreOpen]=React.useState(false);const[tweaksOpen,setTweaksOpen]=React.useState(false);const[notifAlert,setNotifAlert]=React.useState(null);const[tweaks,setTweaks]=React.useState({accent:"#c08a3e",brand:"#0d6e5e",density:"balanced",radius:"soft",sidebar:"dark"});React.useEffect(()=>{function onMsg(e){if(e.data?.type==="__activate_edit_mode")setTweaksOpen(true);if(e.data?.type==="__deactivate_edit_mode")setTweaksOpen(false);}window.addEventListener("message",onMsg);window.parent.postMessage({type:"__edit_mode_available"},"*");return()=>window.removeEventListener("message",onMsg);},[]);React.useEffect(()=>{const root=document.documentElement;root.style.setProperty("--brand",tweaks.brand);root.style.setProperty("--accent",tweaks.accent);if(tweaks.density==="compact"){root.style.setProperty("--r-md","8px");root.style.setProperty("--r-lg","10px");}else if(tweaks.density==="airy"){root.style.setProperty("--r-md","14px");root.style.setProperty("--r-lg","18px");}else{root.style.setProperty("--r-md","12px");root.style.setProperty("--r-lg","16px");}const rmap={sharp:{sm:"4px",md:"6px",lg:"8px"},soft:{sm:"8px",md:"12px",lg:"16px"},round:{sm:"12px",md:"18px",lg:"24px"}}[tweaks.radius];root.style.setProperty("--r-sm",rmap.sm);root.style.setProperty("--r-md",rmap.md);root.style.setProperty("--r-lg",rmap.lg);if(tweaks.sidebar==="light"){root.style.setProperty("--rail-bg","#ffffff");root.style.setProperty("--rail-bg-2","#f4f6f4");root.style.setProperty("--rail-text","#2f3d3a");root.style.setProperty("--rail-text-strong","#0d1815");root.style.setProperty("--rail-muted","#6b7975");root.style.setProperty("--rail-line","#e7eae8");root.style.setProperty("--rail-hover","#f0f3f1");root.style.setProperty("--rail-active","#e6f0ed");}else{root.style.setProperty("--rail-bg","#0f221e");root.style.setProperty("--rail-bg-2","#0a1916");root.style.setProperty("--rail-text","#d8e3df");root.style.setProperty("--rail-text-strong","#ffffff");root.style.setProperty("--rail-muted","#94a59f");root.style.setProperty("--rail-line","rgba(255,255,255,0.08)");root.style.setProperty("--rail-hover","rgba(255,255,255,0.06)");root.style.setProperty("--rail-active","rgba(255,255,255,0.12)");}},[tweaks]);React.useEffect(()=>{if(!user){setNotifAlert(null);return;}const items=lsLoad("notifications",[]);const lastSeen=getLastSeenAt(user.username);const fresh=newNotificationsForUser(items,user,lastSeen);if(fresh.length>0){setNotifAlert(fresh);}},[user]);if(!user){return React.createElement(LoginScreen,{onLogin:u=>{setUser(u);setRoute("dashboard");}});}function navigate(target,payload){if(target==="stock"&&payload)setStockDept(payload);setRoute(target);setMoreOpen(false);}let currentScreen;switch(route){case"dashboard":currentScreen=React.createElement(Dashboard,{currentUser:user,onNavigate:navigate});break;case"stock":currentScreen=React.createElement(StockCount,{currentUser:user,selectedDept:stockDept,onNavigate:navigate});break;case"orders":currentScreen=React.createElement(Orders,{currentUser:user,onNavigate:navigate});break;case"bildirimler":currentScreen=React.createElement(Notifications,{currentUser:user,onNavigate:navigate});break;case"reports":currentScreen=React.createElement(Reports,{onNavigate:navigate});break;case"products":currentScreen=React.createElement(AdminProducts,{onNavigate:navigate});break;case"users":currentScreen=React.createElement(AdminUsers,null);break;case"mail":currentScreen=React.createElement(MailSettings,null);break;default:currentScreen=React.createElement(Dashboard,{currentUser:user,onNavigate:navigate});}const allNav=[...NAV_ITEMS,...ADMIN_NAV].filter(n=>n.roles.includes(user.role));const pendingOrdersCount=ORDER_REQUESTS.filter(o=>o.status==="pending").length;const _notifItems=lsLoad("notifications",[]);const openNotifCount=openNotificationCount(_notifItems,user);return React.createElement("div",{className:"app-shell"},React.createElement("aside",{className:"rail"},React.createElement("div",{className:"rail-brand"},React.createElement("div",{className:"rail-mark"},"OY"),React.createElement("div",{className:"rail-brand-text"},React.createElement("strong",null,"Otel Y\xF6netim"),React.createElement("small",null,"G\xFClplaj Resort"))),React.createElement("nav",{className:"rail-nav"},React.createElement("div",{className:"rail-section-label"},"Operasyon"),NAV_ITEMS.filter(n=>n.roles.includes(user.role)).map(n=>React.createElement("button",{key:n.id,className:`rail-link ${route===n.id?"active":""}`,onClick:()=>navigate(n.id)},React.createElement(Icon,{name:n.icon,size:17}),n.label,n.id==="orders"&&pendingOrdersCount>0&&React.createElement("span",{className:"rail-badge"},pendingOrdersCount),n.id==="bildirimler"&&openNotifCount>0&&React.createElement("span",{className:"rail-badge"},openNotifCount)))),user.role==="admin"&&React.createElement("nav",{className:"rail-nav"},React.createElement("div",{className:"rail-section-label"},"Y\xF6netici"),ADMIN_NAV.map(n=>React.createElement("button",{key:n.id,className:`rail-link ${route===n.id?"active":""}`,onClick:()=>navigate(n.id)},React.createElement(Icon,{name:n.icon,size:17}),n.label))),React.createElement("div",{className:"rail-user"},React.createElement("div",{className:"rail-avatar"},initials(user.name)),React.createElement("div",{className:"rail-user-info"},React.createElement("strong",null,user.name),React.createElement("small",null,user.role==="admin"?"Yönetici":deptById(user.department)?.name)),React.createElement("button",{onClick:()=>setUser(null),title:"\xC7\u0131k\u0131\u015F"},React.createElement(Icon,{name:"logout",size:14})))),React.createElement("div",{className:"mobile-topbar"},React.createElement("div",{className:"mobile-brand"},React.createElement("div",{className:"rail-mark"},"OY"),React.createElement("strong",null,"Otel Y\xF6netim")),React.createElement("div",{className:"mobile-topbar-actions"},React.createElement("button",{className:"mobile-icon-btn"},React.createElement(Icon,{name:"bell"}),React.createElement("span",{className:"dot"})),React.createElement("button",{className:"mobile-icon-btn",onClick:()=>setUser(null),title:"\xC7\u0131k\u0131\u015F"},React.createElement(Icon,{name:"logout"})))),React.createElement("main",{className:"main"},currentScreen),React.createElement("nav",{className:"mobile-nav"},MOBILE_NAV.map(n=>{if(n.id==="more"){return React.createElement("button",{key:n.id,className:moreOpen?"on":"",onClick:()=>setMoreOpen(o=>!o)},React.createElement(Icon,{name:"menu"}),React.createElement("span",null,n.label));}const showDot=n.badge===true&&pendingOrdersCount>0||n.badge==="notif"&&openNotifCount>0;const dotColor=n.badge==="notif"?"var(--warn, #c08a3e)":"var(--danger)";return React.createElement("button",{key:n.id,className:route===n.id?"on":"",onClick:()=>navigate(n.id),style:{position:"relative"}},React.createElement(Icon,{name:n.icon}),showDot&&React.createElement("span",{style:{position:"absolute",top:4,right:22,width:8,height:8,borderRadius:4,background:dotColor}}),React.createElement("span",null,n.label));})),moreOpen&&React.createElement("div",{className:"more-sheet",onClick:()=>setMoreOpen(false)},React.createElement("div",{className:"more-sheet-content",onClick:e=>e.stopPropagation()},React.createElement("div",{className:"more-sheet-handle"}),React.createElement("div",{className:"more-sheet-title"},"Daha fazla"),user.role==="admin"&&ADMIN_NAV.map(n=>React.createElement("button",{key:n.id,className:"more-sheet-item",onClick:()=>navigate(n.id)},React.createElement("div",{className:"more-sheet-icon"},React.createElement(Icon,{name:n.icon})),React.createElement("span",null,n.label),React.createElement(Icon,{name:"arrow_right",size:14}))),React.createElement("button",{className:"more-sheet-item danger",onClick:()=>setUser(null)},React.createElement("div",{className:"more-sheet-icon"},React.createElement(Icon,{name:"logout"})),React.createElement("span",null,"\xC7\u0131k\u0131\u015F yap")))),notifAlert&&notifAlert.length>0&&React.createElement(NotifAlertModal,{notifications:notifAlert,onGo:()=>{markNotificationsSeen(user.username);setNotifAlert(null);navigate("bildirimler");},onDismiss:()=>{markNotificationsSeen(user.username);setNotifAlert(null);}}),tweaksOpen&&React.createElement(TweaksPanel,{tweaks:tweaks,setTweaks:setTweaks,onClose:()=>{setTweaksOpen(false);window.parent.postMessage({type:"__edit_mode_dismissed"},"*");}}));}function TweaksPanel({tweaks,setTweaks,onClose}){function update(key,value){setTweaks(t=>({...t,[key]:value}));}const brandSwatches=[{name:"Zümrüt",value:"#0d6e5e"},{name:"Lacivert",value:"#1c3d6e"},{name:"Bordo",value:"#7a2e3e"},{name:"Kömür",value:"#2a2e2e"}];const accentSwatches=[{name:"Altın",value:"#c08a3e"},{name:"Bakır",value:"#b06030"},{name:"Şampanya",value:"#a89060"},{name:"Hardal",value:"#a18030"}];return React.createElement("div",{className:"tweaks-panel"},React.createElement("div",{className:"tweaks-head"},React.createElement("strong",null,"Tweaks"),React.createElement("button",{onClick:onClose},React.createElement(Icon,{name:"x",size:16}))),React.createElement("div",{className:"tweaks-body"},React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Marka rengi"),React.createElement("div",{className:"swatch-row"},brandSwatches.map(s=>React.createElement("button",{key:s.value,className:`swatch ${tweaks.brand===s.value?"on":""}`,style:{background:s.value},onClick:()=>update("brand",s.value),title:s.name})))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Aksan rengi"),React.createElement("div",{className:"swatch-row"},accentSwatches.map(s=>React.createElement("button",{key:s.value,className:`swatch ${tweaks.accent===s.value?"on":""}`,style:{background:s.value},onClick:()=>update("accent",s.value),title:s.name})))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Yo\u011Funluk"),React.createElement("div",{className:"segmented",style:{width:"100%"}},[{id:"compact",label:"Kompakt"},{id:"balanced",label:"Dengeli"},{id:"airy",label:"Ferah"}].map(o=>React.createElement("button",{key:o.id,className:tweaks.density===o.id?"on":"",onClick:()=>update("density",o.id),style:{flex:1}},o.label)))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"K\xF6\u015Fe yuvarlakl\u0131\u011F\u0131"),React.createElement("div",{className:"segmented",style:{width:"100%"}},[{id:"sharp",label:"Keskin"},{id:"soft",label:"Yumuşak"},{id:"round",label:"Yuvarlak"}].map(o=>React.createElement("button",{key:o.id,className:tweaks.radius===o.id?"on":"",onClick:()=>update("radius",o.id),style:{flex:1}},o.label)))),React.createElement("div",{className:"tweak-section"},React.createElement("label",null,"Sidebar"),React.createElement("div",{className:"segmented",style:{width:"100%"}},React.createElement("button",{className:tweaks.sidebar==="dark"?"on":"",onClick:()=>update("sidebar","dark"),style:{flex:1}},"Koyu"),React.createElement("button",{className:tweaks.sidebar==="light"?"on":"",onClick:()=>update("sidebar","light"),style:{flex:1}},"A\xE7\u0131k")))));}const shellExtraStyles=`
 /* More sheet (mobile) */
 .more-sheet {
   position: fixed;
@@ -1072,4 +1416,4 @@ function _extends(){return _extends=Object.assign?Object.assign.bind():function(
     width: auto;
   }
 }
-`;Object.assign(window,{App,TweaksPanel,SHELL_STYLES:shellExtraStyles});const styleEl=document.getElementById("__runtime-styles");if(styleEl){styleEl.textContent=[window.LOGIN_STYLES,window.DASHBOARD_STYLES,window.STOCK_STYLES,window.SCREEN_STYLES,window.SHELL_STYLES].filter(Boolean).join("\n");}const root=ReactDOM.createRoot(document.getElementById("root"));root.render(React.createElement(App));
+`;Object.assign(window,{App,TweaksPanel,SHELL_STYLES:shellExtraStyles});const styleEl=document.getElementById("__runtime-styles");if(styleEl){styleEl.textContent=[window.LOGIN_STYLES,window.DASHBOARD_STYLES,window.STOCK_STYLES,window.SCREEN_STYLES,window.NOTIF_STYLES,window.SHELL_STYLES].filter(Boolean).join("\n");}const root=ReactDOM.createRoot(document.getElementById("root"));root.render(React.createElement(App));
